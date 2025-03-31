@@ -1,4 +1,4 @@
-module example.com/m/v2
+module FlashQuest
 
 go 1.23.3
 
