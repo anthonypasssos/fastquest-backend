@@ -8,6 +8,7 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"flashquest/models"
 )
 
 var DB *gorm.DB
@@ -32,8 +33,13 @@ func InitDB() *gorm.DB {
 		log.Fatal("Erro ao conectar ao banco:", err)
 	}
 
-	log.Println("Conectado ao banco com sucesso!")
-	DB = db
+	err = db.AutoMigrate(&models.Question{})
+    if err != nil {
+        log.Fatal("Failed to auto-migrate:", err)
+    }
+
+    DB = db
+
 	return db
 }
 

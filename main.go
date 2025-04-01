@@ -2,10 +2,12 @@ package main
 
 import (
 	"log"
-	"FlashQuest/database"
+	"flashquest/database"
+	"fmt"
 )
 
 func main() {
+	fmt.Println("Running backend")
 	database.InitDB()
 
 	srv := NewServer()
