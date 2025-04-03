@@ -8,19 +8,20 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 	"flashquest/models"
+	"strings"
 )
 
 var DB *gorm.DB
 
 func InitDB() *gorm.DB {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Erro ao carregar o arquivo .env")
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file:", err)
 	}
 
 	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASSWORD"),
@@ -28,21 +29,37 @@ func InitDB() *gorm.DB {
 		os.Getenv("DB_PORT"),
 	)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Warn), 
+	})
 	if err != nil {
-		log.Fatal("Erro ao conectar ao banco:", err)
+		log.Fatal("Failed to connect to database:", err)
 	}
 
-	err = db.AutoMigrate(&models.Question{})
-    if err != nil {
-        log.Fatal("Failed to auto-migrate:", err)
-    }
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal("Failed to get generic DB interface:", err)
+	}
 
-    DB = db
+	if err := sqlDB.Ping(); err != nil {
+		log.Fatal("Failed to ping database:", err)
+	}
 
+	if err := db.AutoMigrate(&models.Question{}); err != nil {
+		if !strings.Contains(err.Error(), "already exists") {
+			log.Fatal("Migration failed:", err)
+		}
+		log.Println("Tables already exist, continuing")
+	}
+
+	DB = db
+	log.Println("Database connection established successfully")
 	return db
 }
 
 func GetDB() *gorm.DB {
+	if DB == nil {
+		log.Fatal("Database connection not initialized. Call InitDB() first.")
+	}
 	return DB
 }

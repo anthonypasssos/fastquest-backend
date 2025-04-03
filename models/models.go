@@ -1,14 +1,15 @@
 package models
 
-import "gorm.io/gorm"
+import "time"
 
 type Question struct {
-	gorm.Model
-	Statement string `gorm:"column:statemente;not null"`
-	Subject   int    `gorm:"column:subject"`
-	UserID    int    `gorm:"column:user_id;not null"` // Using standard naming convention
+    ID        uint   `gorm:"primaryKey"`
+    CreatedAt time.Time
+    UpdatedAt time.Time
+    Statement string `gorm:"not null"`
+    Subject   int    
+    UserID    int    `gorm:"not null"`
 }
-
 func (Question) TableName() string {
-	return "questions"
+	return "question"
 }
