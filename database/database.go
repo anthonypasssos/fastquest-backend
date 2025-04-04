@@ -32,6 +32,11 @@ func InitDB() *gorm.DB {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Warn), 
 	})
+
+	if rawDB, err := db.DB(); err == nil {
+		rawDB.Exec("DEALLOCATE ALL") // Clear all prepared statements
+	}
+	
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
