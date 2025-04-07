@@ -40,5 +40,5 @@ func registerPaths(r *mux.Router) {
 
 	// Answer Requests
 	r.HandleFunc("/questions/{id}/answer/create", handlers.PostAnswers).Methods("POST")
-	/*r.HandleFunc("/questions/{id}/answers", getAnswers).Methods("GET")*/
+	r.HandleFunc("/questions/{id}/answers", handlers.GetAnswers).Methods("GET")
 }
