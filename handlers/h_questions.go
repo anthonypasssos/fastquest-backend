@@ -46,6 +46,7 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
+	//teste
 
 	db := database.GetDB()
 	if db == nil {
