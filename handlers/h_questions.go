@@ -9,9 +9,61 @@ import (
 	"log"
 	"net/http"
 
+	"time"
+
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
+
+func CreateQuestion(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Creating question")
+
+	var questionInput struct {
+		Statement string `json:"statement"`
+		SubjectID int    `json:"subject_id"`
+		UserID    int    `json:"user_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&questionInput); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if questionInput.Statement == "" {
+		http.Error(w, "Statement is required", http.StatusBadRequest)
+		return
+	}
+
+	if questionInput.UserID == 0 {
+		http.Error(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+
+	question := models.Question{
+		Statement: questionInput.Statement,
+		SubjectID: questionInput.SubjectID,
+		UserID:    questionInput.UserID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	db := database.GetDB()
+	if db == nil {
+		http.Error(w, "Database connection not established", http.StatusInternalServerError)
+		return
+	}
+
+	result := db.Create(&question)
+	if result.Error != nil {
+		http.Error(w, fmt.Sprintf("Error creating question: %v", result.Error),
+			http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(question)
+}
 
 func GetQuestions(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Getting questions")

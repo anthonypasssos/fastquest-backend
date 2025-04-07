@@ -8,6 +8,7 @@ type Question struct {
 	UpdatedAt time.Time
 	Statement string `gorm:"not null"`
 	Subject   int
+	SubjectID int `gorm:"not null"`
 	UserID    int `gorm:"not null"`
 }
 

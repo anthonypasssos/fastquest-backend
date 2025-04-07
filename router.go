@@ -34,6 +34,7 @@ func NewServer() *http.Server {
 
 func registerPaths(r *mux.Router) {
 	// Question Requests
+	r.HandleFunc("/question/create", handlers.CreateQuestion).Methods("POST")
 	r.HandleFunc("/questions", handlers.GetQuestions).Methods("GET")
 	r.HandleFunc("/question/{id}", handlers.GetQuestion).Methods("GET")
 	r.HandleFunc("/question/{id}/delete", handlers.DeleteQuestion).Methods("DELETE")
