@@ -28,7 +28,7 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	//teste
+
 	if questionInput.Statement == "" {
 		http.Error(w, "Statement is required", http.StatusBadRequest)
 		return
@@ -46,7 +46,6 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	//teste
 
 	db := database.GetDB()
 	if db == nil {
