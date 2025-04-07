@@ -11,6 +11,9 @@ import (
 
 	"time"
 
+	"math"
+	"strconv"
+
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
@@ -66,7 +69,25 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetQuestions(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Getting questions")
+
+	query := r.URL.Query()
+
+	page, err := strconv.Atoi(query.Get("page"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	limit, err := strconv.Atoi(query.Get("limit"))
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	filter := query.Get("filter")
+
+	orderBy := query.Get("order_by")
+	if orderBy == "" {
+		orderBy = "created_at desc"
+	}
 
 	db := database.GetDB()
 	if db == nil {
@@ -74,22 +95,47 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	queryBuilder := db.Model(&models.Question{})
+
+	if filter != "" {
+		queryBuilder = queryBuilder.Where("statement LIKE ?", "%"+filter+"%").
+			Or("subject::text LIKE ?", "%"+filter+"%")
+	}
+
+	queryBuilder = queryBuilder.Order(orderBy)
+
+	var total int64
+	if err := queryBuilder.Count(&total).Error; err != nil {
+		http.Error(w, fmt.Sprintf("Error counting questions: %v", err),
+			http.StatusInternalServerError)
+		return
+	}
+
+	offset := (page - 1) * limit
 	var questions []models.Question
-	result := db.Find(&questions)
+	result := queryBuilder.Offset(offset).Limit(limit).Find(&questions)
+
 	if result.Error != nil {
 		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error),
 			http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Printf("Found %d questions\n", len(questions))
+	response := map[string]interface{}{
+		"data": questions,
+		"pagination": map[string]interface{}{
+			"total":        total,
+			"per_page":     limit,
+			"current_page": page,
+			"last_page":    int(math.Ceil(float64(total) / float64(limit))),
+		},
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(questions); err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
 }
-
 func GetQuestion(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
