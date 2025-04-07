@@ -3,7 +3,10 @@ package main
 import (
 	"net/http"
 	"time"
+
 	//"FlashQuest/database"
+	"flashquest/handlers"
+
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 )
@@ -31,11 +34,11 @@ func NewServer() *http.Server {
 
 func registerPaths(r *mux.Router) {
 	// Question Requests
-	r.HandleFunc("/questions", getQuestions).Methods("GET")
-	r.HandleFunc("/question/{id}", getQuestion).Methods("GET")
-	//r.HandleFunc("/question/{id}/delete", deleteQuestion).Methods("DELETE")
+	r.HandleFunc("/questions", handlers.GetQuestions).Methods("GET")
+	r.HandleFunc("/question/{id}", handlers.GetQuestion).Methods("GET")
+	r.HandleFunc("/question/{id}/delete", handlers.DeleteQuestion).Methods("DELETE")
 
 	// Answer Requests
-	/*r.HandleFunc("/questions/{id}/answer/create", postAnswers).Methods("POST")
-	r.HandleFunc("/questions/{id}/answers", getAnswers).Methods("GET")*/
+	r.HandleFunc("/questions/{id}/answer/create", handlers.PostAnswers).Methods("POST")
+	/*r.HandleFunc("/questions/{id}/answers", getAnswers).Methods("GET")*/
 }
