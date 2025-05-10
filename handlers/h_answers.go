@@ -44,7 +44,7 @@ func PostAnswers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i, answer := range answers {
-		if answer.AnswerDesc == "" {
+		if answer.Answer == "" {
 			http.Error(w, fmt.Sprintf("Answer text is required (index %d)", i), http.StatusBadRequest)
 			return
 		}
@@ -93,7 +93,7 @@ func GetAnswers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var answers []models.Answer
-	result := db.Where("question_id = ?", questionID).Find(&answers)
+	result := db.Where("id_question = ?", questionID).Find(&answers)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
