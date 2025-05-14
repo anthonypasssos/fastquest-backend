@@ -34,6 +34,8 @@ func InitDB() *gorm.DB {
 		os.Getenv("DB_PORT"),
 	)
 
+	log.Println(dsn);
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Warn), 
 	})
