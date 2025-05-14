@@ -16,8 +16,13 @@ import (
 var DB *gorm.DB
 
 func InitDB() *gorm.DB {
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file:", err)
+	env := os.Getenv("RAILWAY_ENVIRONMENT") // esta variável é definida automaticamente no Railway
+
+	if env == "" {
+		// Se não estiver rodando no Railway, tenta carregar o .env local
+		if err := godotenv.Load(); err != nil {
+			log.Println("Aviso: .env não carregado")
+		}
 	}
 
 	dsn := fmt.Sprintf(
