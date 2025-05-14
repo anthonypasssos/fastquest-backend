@@ -16,7 +16,7 @@ func NewServer() *http.Server {
 	registerPaths(r)
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173"}, // Origem permitida
+		AllowedOrigins:   []string{"http://localhost:5173", "https://fastquest.vercel.app"}, // Origem permitida
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
 		AllowCredentials: true,
