@@ -40,6 +40,6 @@ func registerPaths(r *mux.Router) {
 	r.HandleFunc("/question/{id}/delete", handlers.DeleteQuestion).Methods("DELETE")
 
 	// Answer Requests
-	r.HandleFunc("/questions/{id}/answer/create", handlers.PostAnswers).Methods("POST")
-	r.HandleFunc("/questions/{id}/answers", handlers.GetAnswers).Methods("GET")
+	r.HandleFunc("/question/{id}/answer/create", handlers.PostAnswers).Methods("POST")
+	r.HandleFunc("/question/{id}/answers", handlers.GetAnswers).Methods("GET")
 }
