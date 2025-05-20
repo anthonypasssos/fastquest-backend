@@ -172,15 +172,16 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
     if detail == "full" {
         // Define the full question response struct
         type QuestionDetail struct {
-            ID        uint            `json:"id"`
-            CreatedAt time.Time       `json:"created_at"`
-            UpdatedAt time.Time       `json:"updated_at"`
-            Statement string          `json:"statement"`
-            Subject   *models.Subject `json:"subject,omitempty"`
-            Topic     *models.Topic   `json:"topic,omitempty"`
-            UserID    int             `json:"user_id"`
-            Source    *models.Source  `json:"source,omitempty"`
-            Answers   []models.Answer `json:"answers"`
+            ID        uint             `json:"id"`
+            CreatedAt time.Time        `json:"created_at"`
+            UpdatedAt time.Time        `json:"updated_at"`
+            Statement string           `json:"statement"`
+            Subject   *models.Subject  `json:"subject,omitempty"`
+            Topic     *models.Topic    `json:"topic,omitempty"`
+            UserID    int              `json:"user_id"`
+            Source    *models.Source   `json:"source,omitempty"`
+            Answers   []models.Answer  `json:"answers"`
+            Comments  []models.Comment `json:"comments"`
         }
 
         // Get the subject for this question
@@ -217,6 +218,20 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
             return
         }
 
+        // Get comments for this question through comment_relationship
+        var comments []models.Comment
+        commentsErr := db.Table("comment_relationship").
+            Select("comment.id, comment.text, comment.creation_date, comment.user_id").
+            Joins("JOIN comment ON comment_relationship.id_comment = comment.id").
+            Where("comment_relationship.type_reference = ? AND comment_relationship.id_reference = ?", "question", id).
+            Scan(&comments).Error
+
+        if commentsErr != nil && !errors.Is(commentsErr, gorm.ErrRecordNotFound) {
+            http.Error(w, fmt.Sprintf("Error fetching comments: %v", commentsErr),
+                http.StatusInternalServerError)
+            return
+        }
+
         // Prepare the full response
         fullResponse := QuestionDetail{
             ID:        question.ID,
@@ -225,6 +240,7 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
             Statement: question.Statement,
             UserID:    question.UserID,
             Answers:   answers,
+            Comments:  comments,
         }
 
         // Only include subject if it was found
