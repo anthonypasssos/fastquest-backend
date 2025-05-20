@@ -177,6 +177,7 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
             UpdatedAt time.Time       `json:"updated_at"`
             Statement string          `json:"statement"`
             Subject   *models.Subject `json:"subject,omitempty"`
+            Topic     *models.Topic   `json:"topic,omitempty"`
             UserID    int             `json:"user_id"`
             Source    *models.Source  `json:"source,omitempty"`
             Answers   []models.Answer `json:"answers"`
@@ -190,6 +191,14 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
                 http.StatusInternalServerError)
             return
         }
+
+        // Get the topic for this question through question_topic join table
+        var topic models.Topic
+        topicErr := db.Table("question_topic").
+            Select("topic.id, topic.name, topic.subject_id").
+            Joins("JOIN topic ON question_topic.topic_id = topic.id").
+            Where("question_topic.question_id = ?", id).
+            Scan(&topic).Error
 
         // Get the source for this question
         var source models.Source
@@ -221,6 +230,11 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
         // Only include subject if it was found
         if subjectErr == nil {
             fullResponse.Subject = &subject
+        }
+
+        // Only include topic if it was found
+        if topicErr == nil {
+            fullResponse.Topic = &topic
         }
 
         // Only include source if it was found AND has metadata
