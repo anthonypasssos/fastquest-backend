@@ -139,71 +139,45 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 
 // GET Question
 func GetQuestion(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
-    id := vars["id"]
+	vars := mux.Vars(r)
+	id := vars["id"]
 
-    if id == "" {
-        http.Error(w, "ID parameter is required", http.StatusBadRequest)
-        return
-    }
+	if id == "" {
+		http.Error(w, "ID parameter is required", http.StatusBadRequest)
+		return
+	}
 
-    db := database.GetDB()
-    if db == nil {
-        http.Error(w, "Database connection not established", http.StatusInternalServerError)
-        return
-    }
+	db := database.GetDB()
+	if db == nil {
+		http.Error(w, "Database connection not established", http.StatusInternalServerError)
+		return
+	}
 
-    query := r.URL.Query()
-    detail := query.Get("detail")
+	var question models.Question
+	result := db.Where("id = ?", id).First(&question)
 
-    var question models.Question
-    var result *gorm.DB
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			http.Error(w, "Question not found", http.StatusNotFound)
+		} else {
+			http.Error(w, fmt.Sprintf("Error fetching question: %v", result.Error),
+				http.StatusInternalServerError)
+		}
+		return
+	}
 
-    if detail == "full" {
-        result = db.
-            Preload("Answers").
-            Preload("Subject").
-            // For many-to-many relationships
-            Preload("Topics", func(db *gorm.DB) *gorm.DB {
-                return db.Joins("JOIN question_topic ON question_topic.topic_id = topic.id").
-                    Where("question_topic.question_id = ?", id)
-            }).
-            Preload("Sources", func(db *gorm.DB) *gorm.DB {
-                return db.Joins("JOIN question_source ON question_source.source_id = source.id").
-                    Where("question_source.question_id = ?", id)
-            }).
-            Preload("User", func(db *gorm.DB) *gorm.DB {
-                return db.Select("id", "name") // Only select ID and Name
-            }).
-            Preload("Comments", func(db *gorm.DB) *gorm.DB {
-                return db.Order("comments.creation_date DESC").
-                    Preload("User", func(db *gorm.DB) *gorm.DB {
-                        return db.Select("id", "name") // Also limit user fields in comments
-                    })
-            }).
-            Where("id = ?", id).
-            First(&question)
-    } else {
-        result = db.
-            Select("id", "statement", "subject_id", "user_id", "created_at", "updated_at").
-            Where("id = ?", id).
-            First(&question)
-    }
-
-    if result.Error != nil {
-        if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-            http.Error(w, "Question not found", http.StatusNotFound)
-        } else {
-            http.Error(w, fmt.Sprintf("Error fetching question: %v", result.Error),
-                http.StatusInternalServerError)
-        }
-        return
-    }
-
-    w.Header().Set("Content-Type", "application/json")
-    if err := json.NewEncoder(w).Encode(question); err != nil {
-        http.Error(w, "Error encoding response", http.StatusInternalServerError)
-    }
+	query := r.URL.Query()
+	detail := query.Get("detail")
+	fmt.Println(detail)
+	if detail == "full" {
+		// Get full detail here
+	} else {
+		fmt.Printf("Found question %s \n", id)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(question); err != nil {
+			http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		}
+	}
 }
 
 func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
