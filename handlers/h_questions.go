@@ -170,6 +170,12 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
     detail := query.Get("detail")
     fmt.Println(detail)
     if detail == "full" {
+        // Define a safe user response struct without sensitive fields
+        type SafeUser struct {
+            ID   uint   `json:"id"`
+            Name string `json:"name"`
+        }
+
         // Define the full question response struct
         type QuestionDetail struct {
             ID        uint             `json:"id"`
@@ -178,7 +184,7 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
             Statement string           `json:"statement"`
             Subject   *models.Subject  `json:"subject,omitempty"`
             Topic     *models.Topic    `json:"topic,omitempty"`
-            UserID    int              `json:"user_id"`
+            User      *SafeUser        `json:"user,omitempty"`
             Source    *models.Source   `json:"source,omitempty"`
             Answers   []models.Answer  `json:"answers"`
             Comments  []models.Comment `json:"comments"`
@@ -232,13 +238,21 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
             return
         }
 
+        // Get user information
+        var user models.User
+        userErr := db.Where("id = ?", question.UserID).First(&user).Error
+        if userErr != nil && !errors.Is(userErr, gorm.ErrRecordNotFound) {
+            http.Error(w, fmt.Sprintf("Error fetching user: %v", userErr),
+                http.StatusInternalServerError)
+            return
+        }
+
         // Prepare the full response
         fullResponse := QuestionDetail{
             ID:        question.ID,
             CreatedAt: question.CreatedAt,
             UpdatedAt: question.UpdatedAt,
             Statement: question.Statement,
-            UserID:    question.UserID,
             Answers:   answers,
             Comments:  comments,
         }
@@ -256,6 +270,14 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
         // Only include source if it was found AND has metadata
         if sourceErr == nil && len(source.Metadata) > 0 {
             fullResponse.Source = &source
+        }
+
+        // Only include user if it was found (without sensitive fields)
+        if userErr == nil {
+            fullResponse.User = &SafeUser{
+                ID:   user.ID,
+                Name: user.Name,
+            }
         }
 
         fmt.Printf("Found question with full detail %s \n", id)
