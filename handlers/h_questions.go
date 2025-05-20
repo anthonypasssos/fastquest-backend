@@ -153,31 +153,44 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	query := r.URL.Query()
+    detail := query.Get("detail")
+
 	var question models.Question
 	result := db.Where("id = ?", id).First(&question)
 
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			http.Error(w, "Question not found", http.StatusNotFound)
-		} else {
-			http.Error(w, fmt.Sprintf("Error fetching question: %v", result.Error),
-				http.StatusInternalServerError)
-		}
-		return
-	}
+    if detail == "full" {
+        result = db.
+            Preload("Answers").
+            Preload("Subject").
+            Preload("Topic").
+            Preload("Source").
+			Preload("User", func(db *gorm.DB) *gorm.DB {
+				return db.Select("id", "name") // Only select these fields
+			}).
+            Preload("Comments", func(db *gorm.DB) *gorm.DB {
+                return db.Order("comments.creation_date DESC")
+            }).
+            Where("id = ?", id).
+            First(&question)
+    } else {
+        result = db.Where("id = ?", id).First(&question)
+    }
 
-	query := r.URL.Query()
-	detail := query.Get("detail")
-	fmt.Println(detail)
-	if detail == "full" {
-		// Get full detail here :/
-	} else {
-		fmt.Printf("Found question %s \n", id)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(question); err != nil {
-			http.Error(w, "Error encoding response", http.StatusInternalServerError)
-		}
-	}
+    if result.Error != nil {
+        if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+            http.Error(w, "Question not found", http.StatusNotFound)
+        } else {
+            http.Error(w, fmt.Sprintf("Error fetching question: %v", result.Error),
+                http.StatusInternalServerError)
+        }
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    if err := json.NewEncoder(w).Encode(question); err != nil {
+        http.Error(w, "Error encoding response", http.StatusInternalServerError)
+    }
 }
 
 func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
