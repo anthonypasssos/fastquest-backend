@@ -139,42 +139,55 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 
 // GET Question
 func GetQuestion(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+    vars := mux.Vars(r)
+    id := vars["id"]
 
-	if id == "" {
-		http.Error(w, "ID parameter is required", http.StatusBadRequest)
-		return
-	}
+    if id == "" {
+        http.Error(w, "ID parameter is required", http.StatusBadRequest)
+        return
+    }
 
-	db := database.GetDB()
-	if db == nil {
-		http.Error(w, "Database connection not established", http.StatusInternalServerError)
-		return
-	}
+    db := database.GetDB()
+    if db == nil {
+        http.Error(w, "Database connection not established", http.StatusInternalServerError)
+        return
+    }
 
-	query := r.URL.Query()
+    query := r.URL.Query()
     detail := query.Get("detail")
 
-	var question models.Question
-	result := db.Where("id = ?", id).First(&question)
+    var question models.Question
+    var result *gorm.DB
 
     if detail == "full" {
         result = db.
             Preload("Answers").
             Preload("Subject").
-            Preload("Topic").
-            Preload("Source").
-			Preload("User", func(db *gorm.DB) *gorm.DB {
-				return db.Select("id", "name") // Only select these fields
-			}).
+            // For many-to-many relationships
+            Preload("Topics", func(db *gorm.DB) *gorm.DB {
+                return db.Joins("JOIN question_topic ON question_topic.topic_id = topic.id").
+                    Where("question_topic.question_id = ?", id)
+            }).
+            Preload("Sources", func(db *gorm.DB) *gorm.DB {
+                return db.Joins("JOIN question_source ON question_source.source_id = source.id").
+                    Where("question_source.question_id = ?", id)
+            }).
+            Preload("User", func(db *gorm.DB) *gorm.DB {
+                return db.Select("id", "name") // Only select ID and Name
+            }).
             Preload("Comments", func(db *gorm.DB) *gorm.DB {
-                return db.Order("comments.creation_date DESC")
+                return db.Order("comments.creation_date DESC").
+                    Preload("User", func(db *gorm.DB) *gorm.DB {
+                        return db.Select("id", "name") // Also limit user fields in comments
+                    })
             }).
             Where("id = ?", id).
             First(&question)
     } else {
-        result = db.Where("id = ?", id).First(&question)
+        result = db.
+            Select("id", "statement", "subject_id", "user_id", "created_at", "updated_at").
+            Where("id = ?", id).
+            First(&question)
     }
 
     if result.Error != nil {
