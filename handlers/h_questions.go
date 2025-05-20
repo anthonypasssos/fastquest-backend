@@ -136,6 +136,8 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
 }
+
+// GET Question
 func GetQuestion(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
@@ -163,6 +165,18 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
+	query := r.URL.Query()
+	detail := query.Get("detail")
+	if detail != nil {
+		http.Error(w, fmt.Sprintf("Detail query not given"),
+		http.StatusInternalServerError)
+	} else {
+		http.Error(w, fmt.Sprintf("Detail query given"),
+		http.StatusInternalServerError)
+	}
+
+
 
 	fmt.Printf("Found question %s \n", id)
 	w.Header().Set("Content-Type", "application/json")
