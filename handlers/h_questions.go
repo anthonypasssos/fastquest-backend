@@ -168,15 +168,6 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.Query()
 	detail := query.Get("detail")
-	if detail != nil {
-		http.Error(w, fmt.Sprintf("Detail query not given"),
-		http.StatusInternalServerError)
-	} else {
-		http.Error(w, fmt.Sprintf("Detail query given"),
-		http.StatusInternalServerError)
-	}
-
-
 
 	fmt.Printf("Found question %s \n", id)
 	w.Header().Set("Content-Type", "application/json")
