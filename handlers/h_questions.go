@@ -139,45 +139,89 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 
 // GET Question
 func GetQuestion(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+    vars := mux.Vars(r)
+    id := vars["id"]
 
-	if id == "" {
-		http.Error(w, "ID parameter is required", http.StatusBadRequest)
-		return
-	}
+    if id == "" {
+        http.Error(w, "ID parameter is required", http.StatusBadRequest)
+        return
+    }
 
-	db := database.GetDB()
-	if db == nil {
-		http.Error(w, "Database connection not established", http.StatusInternalServerError)
-		return
-	}
+    db := database.GetDB()
+    if db == nil {
+        http.Error(w, "Database connection not established", http.StatusInternalServerError)
+        return
+    }
 
-	var question models.Question
-	result := db.Where("id = ?", id).First(&question)
+    var question models.Question
+    result := db.Where("id = ?", id).First(&question)
 
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			http.Error(w, "Question not found", http.StatusNotFound)
-		} else {
-			http.Error(w, fmt.Sprintf("Error fetching question: %v", result.Error),
-				http.StatusInternalServerError)
-		}
-		return
-	}
+    if result.Error != nil {
+        if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+            http.Error(w, "Question not found", http.StatusNotFound)
+        } else {
+            http.Error(w, fmt.Sprintf("Error fetching question: %v", result.Error),
+                http.StatusInternalServerError)
+        }
+        return
+    }
 
-	query := r.URL.Query()
-	detail := query.Get("detail")
-	fmt.Println(detail)
-	if detail == "full" {
-		// Get full detail here
-	} else {
-		fmt.Printf("Found question %s \n", id)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(question); err != nil {
-			http.Error(w, "Error encoding response", http.StatusInternalServerError)
-		}
-	}
+    query := r.URL.Query()
+    detail := query.Get("detail")
+    fmt.Println(detail)
+    if detail == "full" {
+        // Define a struct for the full response
+        type QuestionDetail struct {
+            ID        uint           `json:"id"`
+            CreatedAt time.Time     `json:"created_at"`
+            UpdatedAt time.Time     `json:"updated_at"`
+            Statement string        `json:"statement"`
+            SubjectID int            `json:"subject_id"`
+            UserID    int            `json:"user_id"`
+            Source    *models.Source `json:"source,omitempty"`
+        }
+
+        // Get the source for this question through the question_source join table
+        var source models.Source
+        err := db.Table("question_source").
+            Select("source.id, source.name, source.type, source.metadata").
+            Joins("JOIN source ON question_source.source_id = source.id").
+            Where("question_source.question_id = ?", id).
+            Scan(&source).Error
+
+        if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+            http.Error(w, fmt.Sprintf("Error fetching question source: %v", err),
+                http.StatusInternalServerError)
+            return
+        }
+
+        // Prepare the full response
+        fullResponse := QuestionDetail{
+            ID:        question.ID,
+            CreatedAt: question.CreatedAt,
+            UpdatedAt: question.UpdatedAt,
+            Statement: question.Statement,
+            SubjectID: question.SubjectID,
+            UserID:    question.UserID,
+        }
+
+        // Only include source if it was found
+        if err == nil {
+            fullResponse.Source = &source
+        }
+
+        fmt.Printf("Found question with full detail %s \n", id)
+        w.Header().Set("Content-Type", "application/json")
+        if err := json.NewEncoder(w).Encode(fullResponse); err != nil {
+            http.Error(w, "Error encoding response", http.StatusInternalServerError)
+        }
+    } else {
+        fmt.Printf("Found question %s \n", id)
+        w.Header().Set("Content-Type", "application/json")
+        if err := json.NewEncoder(w).Encode(question); err != nil {
+            http.Error(w, "Error encoding response", http.StatusInternalServerError)
+        }
+    }
 }
 
 func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
