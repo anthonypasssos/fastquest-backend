@@ -170,27 +170,37 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
     detail := query.Get("detail")
     fmt.Println(detail)
     if detail == "full" {
-        // Define a struct for the full response
+        // Define the full question response struct using existing models
         type QuestionDetail struct {
-            ID        uint           `json:"id"`
-            CreatedAt time.Time     `json:"created_at"`
-            UpdatedAt time.Time     `json:"updated_at"`
-            Statement string        `json:"statement"`
-            SubjectID int            `json:"subject_id"`
-            UserID    int            `json:"user_id"`
-            Source    *models.Source `json:"source,omitempty"`
+            ID        uint            `json:"id"`
+            CreatedAt time.Time       `json:"created_at"`
+            UpdatedAt time.Time       `json:"updated_at"`
+            Statement string          `json:"statement"`
+            SubjectID int             `json:"subject_id"`
+            UserID    int             `json:"user_id"`
+            Source    *models.Source  `json:"source,omitempty"`
+            Answers   []models.Answer `json:"answers"`
         }
 
-        // Get the source for this question through the question_source join table
+        // Get the source for this question
         var source models.Source
-        err := db.Table("question_source").
+        sourceErr := db.Table("question_source").
             Select("source.id, source.name, source.type, source.metadata").
             Joins("JOIN source ON question_source.source_id = source.id").
             Where("question_source.question_id = ?", id).
             Scan(&source).Error
 
-        if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-            http.Error(w, fmt.Sprintf("Error fetching question source: %v", err),
+        if sourceErr != nil && !errors.Is(sourceErr, gorm.ErrRecordNotFound) {
+            http.Error(w, fmt.Sprintf("Error fetching question source: %v", sourceErr),
+                http.StatusInternalServerError)
+            return
+        }
+
+        // Get answers for this question
+        var answers []models.Answer
+        answersErr := db.Where("id_question = ?", id).Find(&answers).Error
+        if answersErr != nil && !errors.Is(answersErr, gorm.ErrRecordNotFound) {
+            http.Error(w, fmt.Sprintf("Error fetching answers: %v", answersErr),
                 http.StatusInternalServerError)
             return
         }
@@ -203,10 +213,11 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
             Statement: question.Statement,
             SubjectID: question.SubjectID,
             UserID:    question.UserID,
+            Answers:   answers,
         }
 
         // Only include source if it was found
-        if err == nil {
+        if sourceErr == nil {
             fullResponse.Source = &source
         }
 
