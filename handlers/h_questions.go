@@ -168,6 +168,9 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.Query()
 	detail := query.Get("detail")
+	if detail != nil {
+		fmt.Println(detail)
+	}
 
 	fmt.Printf("Found question %s \n", id)
 	w.Header().Set("Content-Type", "application/json")
