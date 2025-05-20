@@ -170,16 +170,25 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
     detail := query.Get("detail")
     fmt.Println(detail)
     if detail == "full" {
-        // Define the full question response struct using existing models
+        // Define the full question response struct
         type QuestionDetail struct {
             ID        uint            `json:"id"`
             CreatedAt time.Time       `json:"created_at"`
             UpdatedAt time.Time       `json:"updated_at"`
             Statement string          `json:"statement"`
-            SubjectID int             `json:"subject_id"`
+            Subject   *models.Subject `json:"subject,omitempty"`
             UserID    int             `json:"user_id"`
             Source    *models.Source  `json:"source,omitempty"`
             Answers   []models.Answer `json:"answers"`
+        }
+
+        // Get the subject for this question
+        var subject models.Subject
+        subjectErr := db.Where("id = ?", question.SubjectID).First(&subject).Error
+        if subjectErr != nil && !errors.Is(subjectErr, gorm.ErrRecordNotFound) {
+            http.Error(w, fmt.Sprintf("Error fetching subject: %v", subjectErr),
+                http.StatusInternalServerError)
+            return
         }
 
         // Get the source for this question
@@ -189,12 +198,6 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
             Joins("JOIN source ON question_source.source_id = source.id").
             Where("question_source.question_id = ?", id).
             Scan(&source).Error
-
-        if sourceErr != nil && !errors.Is(sourceErr, gorm.ErrRecordNotFound) {
-            http.Error(w, fmt.Sprintf("Error fetching question source: %v", sourceErr),
-                http.StatusInternalServerError)
-            return
-        }
 
         // Get answers for this question
         var answers []models.Answer
@@ -211,13 +214,17 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
             CreatedAt: question.CreatedAt,
             UpdatedAt: question.UpdatedAt,
             Statement: question.Statement,
-            SubjectID: question.SubjectID,
             UserID:    question.UserID,
             Answers:   answers,
         }
 
-        // Only include source if it was found
-        if sourceErr == nil {
+        // Only include subject if it was found
+        if subjectErr == nil {
+            fullResponse.Subject = &subject
+        }
+
+        // Only include source if it was found AND has metadata
+        if sourceErr == nil && len(source.Metadata) > 0 {
             fullResponse.Source = &source
         }
 
