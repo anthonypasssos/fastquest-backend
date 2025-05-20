@@ -44,7 +44,7 @@ func PostAnswers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i, answer := range answers {
-		if answer.Answer == "" {
+		if answer.Text == "" {
 			http.Error(w, fmt.Sprintf("Answer text is required (index %d)", i), http.StatusBadRequest)
 			return
 		}
