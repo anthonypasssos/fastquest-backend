@@ -169,11 +169,14 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	detail := query.Get("detail")
 	fmt.Println(detail)
-
-	fmt.Printf("Found question %s \n", id)
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(question); err != nil {
-		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+	if detail == "full" {
+		// Get full detail here :/
+	} else {
+		fmt.Printf("Found question %s \n", id)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(question); err != nil {
+			http.Error(w, "Error encoding response", http.StatusInternalServerError)
+		}
 	}
 }
 
