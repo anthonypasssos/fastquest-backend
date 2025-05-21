@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 
+    "pkg/filters"
+
 	"time"
 
 	"math"
@@ -69,9 +71,9 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetQuestions(w http.ResponseWriter, r *http.Request) {
-
 	query := r.URL.Query()
 
+	// Paginação
 	page, err := strconv.Atoi(query.Get("page"))
 	if err != nil || page < 1 {
 		page = 1
@@ -82,8 +84,7 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		limit = 10
 	}
 
-	filter := query.Get("filter")
-
+	// Ordenação
 	orderBy := query.Get("order_by")
 	if orderBy == "" {
 		orderBy = "created_at desc"
@@ -97,10 +98,12 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 
 	queryBuilder := db.Model(&models.Question{})
 
-	if filter != "" {
-		queryBuilder = queryBuilder.Where("statement LIKE ?", "%"+filter+"%").
-			Or("subject::text LIKE ?", "%"+filter+"%")
-	}
+    //Aplicação dos Filtros
+    for param, handler := range filters.QuestionFilters {
+        if value := query.Get(param); value != "" {
+            queryBuilder = handler(value, queryBuilder)
+        }
+    }
 
 	queryBuilder = queryBuilder.Order(orderBy)
 
