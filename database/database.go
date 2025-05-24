@@ -5,12 +5,13 @@ import (
 	"log"
 	"os"
 
+	"flashquest/pkg/models"
+	"strings"
+
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"flashquest/models"
-	"strings"
 )
 
 var DB *gorm.DB
@@ -34,16 +35,16 @@ func InitDB() *gorm.DB {
 		os.Getenv("DB_PORT"),
 	)
 
-	log.Println(dsn);
+	log.Println(dsn)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn), 
+		Logger: logger.Default.LogMode(logger.Warn),
 	})
 
 	if rawDB, err := db.DB(); err == nil {
 		rawDB.Exec("DEALLOCATE ALL") // Clear all prepared statements
 	}
-	
+
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}

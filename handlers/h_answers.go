@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flashquest/database"
-	"flashquest/models"
+	"flashquest/pkg/models"
 	"fmt"
 	"net/http"
 
