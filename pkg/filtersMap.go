@@ -18,7 +18,7 @@ var QuestionFilters = map[string]FilterFunc{
 	"subject": func(value string, qb *gorm.DB) *gorm.DB {
 		return qb.
 			Joins("INNER JOIN subject ON subject.id = question.subject_id").
-			Where("subject.name = ?", value) // Assumindo que subjects.name armazena "Direito Constitucional"
+			Where("subject.id = ?", value) // Assumindo que subjects.name armazena "Direito Constitucional"
 	},
 	"topic": func(value string, qb *gorm.DB) *gorm.DB {
 		return qb.Where("topic = ?", value)
