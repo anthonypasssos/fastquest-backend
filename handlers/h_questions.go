@@ -139,7 +139,6 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GET Question
 func GetQuestion(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
@@ -170,129 +169,14 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.Query()
 	detail := query.Get("detail")
-	fmt.Println(detail)
-	if detail == "full" {
-		// Define a safe user response struct without sensitive fields
-		type SafeUser struct {
-			ID   uint   `json:"id"`
-			Name string `json:"name"`
-		}
 
-		// Define the full question response struct
-		type QuestionDetail struct {
-			ID        uint             `json:"id"`
-			CreatedAt time.Time        `json:"created_at"`
-			UpdatedAt time.Time        `json:"updated_at"`
-			Statement string           `json:"statement"`
-			Subject   *models.Subject  `json:"subject,omitempty"`
-			Topic     *models.Topic    `json:"topic,omitempty"`
-			User      *SafeUser        `json:"user,omitempty"`
-			Source    *models.Source   `json:"source,omitempty"`
-			Answers   []models.Answer  `json:"answers"`
-			Comments  []models.Comment `json:"comments"`
-		}
-
-		// Get the subject for this question
-		var subject models.Subject
-		subjectErr := db.Where("id = ?", question.SubjectID).First(&subject).Error
-		if subjectErr != nil && !errors.Is(subjectErr, gorm.ErrRecordNotFound) {
-			http.Error(w, fmt.Sprintf("Error fetching subject: %v", subjectErr),
-				http.StatusInternalServerError)
-			return
-		}
-
-		// Get the topic for this question through question_topic join table
-		var topic models.Topic
-		topicErr := db.Table("question_topic").
-			Select("topic.id, topic.name, topic.subject_id").
-			Joins("JOIN topic ON question_topic.topic_id = topic.id").
-			Where("question_topic.question_id = ?", id).
-			Scan(&topic).Error
-
-		// Get the source for this question
-		var source models.Source
-		sourceErr := db.Table("question_source").
-			Select("source.id, source.name, source.type, source.metadata").
-			Joins("JOIN source ON question_source.source_id = source.id").
-			Where("question_source.question_id = ?", id).
-			Scan(&source).Error
-
-		// Get answers for this question
-		var answers []models.Answer
-		answersErr := db.Where("id_question = ?", id).Find(&answers).Error
-		if answersErr != nil && !errors.Is(answersErr, gorm.ErrRecordNotFound) {
-			http.Error(w, fmt.Sprintf("Error fetching answers: %v", answersErr),
-				http.StatusInternalServerError)
-			return
-		}
-
-		// Get comments for this question through comment_relationship
-		var comments []models.Comment
-		commentsErr := db.Table("comment_relationship").
-			Select("comment.id, comment.text, comment.creation_date, comment.user_id").
-			Joins("JOIN comment ON comment_relationship.id_comment = comment.id").
-			Where("comment_relationship.type_reference = ? AND comment_relationship.id_reference = ?", "question", id).
-			Scan(&comments).Error
-
-		if commentsErr != nil && !errors.Is(commentsErr, gorm.ErrRecordNotFound) {
-			http.Error(w, fmt.Sprintf("Error fetching comments: %v", commentsErr),
-				http.StatusInternalServerError)
-			return
-		}
-
-		// Get user information
-		var user models.User
-		userErr := db.Where("id = ?", question.UserID).First(&user).Error
-		if userErr != nil && !errors.Is(userErr, gorm.ErrRecordNotFound) {
-			http.Error(w, fmt.Sprintf("Error fetching user: %v", userErr),
-				http.StatusInternalServerError)
-			return
-		}
-
-		// Prepare the full response
-		fullResponse := QuestionDetail{
-			ID:        question.ID,
-			CreatedAt: question.CreatedAt,
-			UpdatedAt: question.UpdatedAt,
-			Statement: question.Statement,
-			Answers:   answers,
-			Comments:  comments,
-		}
-
-		// Only include subject if it was found
-		if subjectErr == nil {
-			fullResponse.Subject = &subject
-		}
-
-		// Only include topic if it was found
-		if topicErr == nil {
-			fullResponse.Topic = &topic
-		}
-
-		// Only include source if it was found AND has metadata
-		if sourceErr == nil && len(source.Metadata) > 0 {
-			fullResponse.Source = &source
-		}
-
-		// Only include user if it was found (without sensitive fields)
-		if userErr == nil {
-			fullResponse.User = &SafeUser{
-				ID:   user.ID,
-				Name: user.Name,
-			}
-		}
-
-		fmt.Printf("Found question with full detail %s \n", id)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(fullResponse); err != nil {
-			http.Error(w, "Error encoding response", http.StatusInternalServerError)
-		}
-	} else {
-		fmt.Printf("Found question %s \n", id)
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(question); err != nil {
-			http.Error(w, "Error encoding response", http.StatusInternalServerError)
-		}
+	switch detail {
+	case "full":
+		handleFullDetail(w, db, id, question)
+	case "information":
+		handleInformationDetail(w, db, id, question)
+	default:
+		handleDefaultDetail(w, question)
 	}
 }
 
@@ -326,4 +210,139 @@ func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Question ID %s deleted successfully", id)
+}
+
+
+
+// Question functions //
+
+func handleFullDetail(w http.ResponseWriter, db *gorm.DB, id string, question models.Question) {
+	// Define a safe user response struct without sensitive fields
+	type SafeUser struct {
+		ID   uint   `json:"id"`
+		Name string `json:"name"`
+	}
+
+	// Define the full question response struct
+	type QuestionDetail struct {
+		ID        uint             `json:"id"`
+		CreatedAt time.Time        `json:"created_at"`
+		UpdatedAt time.Time        `json:"updated_at"`
+		Statement string           `json:"statement"`
+		Subject   *models.Subject  `json:"subject,omitempty"`
+		Topic     *models.Topic    `json:"topic,omitempty"`
+		User      *SafeUser        `json:"user,omitempty"`
+		Source    *models.Source   `json:"source,omitempty"`
+		Answers   []models.Answer  `json:"answers"`
+		Comments  []models.Comment `json:"comments"`
+	}
+
+	// Get related data
+	subject, subjectErr := getQuestionSubject(db, question.SubjectID)
+	topic, topicErr := getQuestionTopic(db, id)
+	source, sourceErr := getQuestionSource(db, id)
+	answers, _ := getQuestionAnswers(db, id)
+	comments, _ := getQuestionComments(db, id)
+	user, userErr := getQuestionUser(db, question.UserID)
+
+	// Prepare the full response
+	fullResponse := QuestionDetail{
+		ID:        question.ID,
+		CreatedAt: question.CreatedAt,
+		UpdatedAt: question.UpdatedAt,
+		Statement: question.Statement,
+		Answers:   answers,
+		Comments:  comments,
+	}
+
+	// Only include subject if it was found
+	if subjectErr == nil {
+		fullResponse.Subject = subject
+	}
+
+	// Only include topic if it was found
+	if topicErr == nil {
+		fullResponse.Topic = topic
+	}
+
+	// Only include source if it was found AND has metadata
+	if sourceErr == nil && len(source.Metadata) > 0 {
+		fullResponse.Source = source
+	}
+
+	// Only include user if it was found (without sensitive fields)
+	if userErr == nil {
+		fullResponse.User = &SafeUser{
+			ID:   user.ID,
+			Name: user.Name,
+		}
+	}
+
+	fmt.Printf("Found question with full detail %s \n", id)
+	sendResponse(w, fullResponse)
+}
+
+func handleInformationDetail(w http.ResponseWriter, db *gorm.DB, id string, question models.Question) {
+	// Define a safe user response struct without sensitive fields
+	type SafeUser struct {
+		ID   uint   `json:"id"`
+		Name string `json:"name"`
+	}
+
+	// Define the information question response struct
+	type QuestionInfo struct {
+		ID        uint            `json:"id"`
+		CreatedAt time.Time       `json:"created_at"`
+		UpdatedAt time.Time       `json:"updated_at"`
+		Statement string          `json:"statement"`
+		Subject   *models.Subject `json:"subject,omitempty"`
+		Topic     *models.Topic   `json:"topic,omitempty"`
+		User      *SafeUser       `json:"user,omitempty"`
+		Source    *models.Source  `json:"source,omitempty"`
+	}
+
+	// Get related data (excluding answers and comments)
+	subject, subjectErr := getQuestionSubject(db, question.SubjectID)
+	topic, topicErr := getQuestionTopic(db, id)
+	source, sourceErr := getQuestionSource(db, id)
+	user, userErr := getQuestionUser(db, question.UserID)
+
+	// Prepare the information response
+	infoResponse := QuestionInfo{
+		ID:        question.ID,
+		CreatedAt: question.CreatedAt,
+		UpdatedAt: question.UpdatedAt,
+		Statement: question.Statement,
+	}
+
+	// Only include subject if it was found
+	if subjectErr == nil {
+		infoResponse.Subject = subject
+	}
+
+	// Only include topic if it was found
+	if topicErr == nil {
+		infoResponse.Topic = topic
+	}
+
+	// Only include source if it was found AND has metadata
+	if sourceErr == nil && len(source.Metadata) > 0 {
+		infoResponse.Source = source
+	}
+
+	// Only include user if it was found (without sensitive fields)
+	if userErr == nil {
+		infoResponse.User = &SafeUser{
+			ID:   user.ID,
+			Name: user.Name,
+		}
+	}
+
+	fmt.Printf("Found question with information detail %s \n", id)
+	sendResponse(w, infoResponse)
+}
+
+func handleDefaultDetail(w http.ResponseWriter, question models.Question) {
+	fmt.Printf("Found question %s \n", question.ID)
+	sendResponse(w, question)
 }
