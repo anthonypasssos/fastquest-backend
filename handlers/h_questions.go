@@ -73,7 +73,7 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 func GetQuestions(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
-	// Paginação
+	// Pagination
 	page, err := strconv.Atoi(query.Get("page"))
 	if err != nil || page < 1 {
 		page = 1
@@ -84,11 +84,14 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		limit = 10
 	}
 
-	// Ordenação
+	// Ordering
 	orderBy := query.Get("order_by")
 	if orderBy == "" {
 		orderBy = "created_at desc"
 	}
+
+	// Detail level
+	detail := query.Get("detail")
 
 	db := database.GetDB()
 	if db == nil {
@@ -123,6 +126,22 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle response based on detail level
+	w.Header().Set("Content-Type", "application/json")
+
+	if detail != "" {
+		// For detailed responses, we need to handle pagination separately
+		switch detail {
+		case "full":
+			handleFullDetail(w, db, questions)
+			return
+		case "information":
+			handleInformationDetail(w, db, questions)
+			return
+		}
+	}
+
+	// Default response with pagination
 	response := map[string]interface{}{
 		"data": questions,
 		"pagination": map[string]interface{}{
@@ -133,7 +152,6 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
@@ -172,9 +190,9 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 
 	switch detail {
 	case "full":
-		handleFullDetail(w, db, id, question)
+		handleFullDetail(w, db, question)
 	case "information":
-		handleInformationDetail(w, db, id, question)
+		handleInformationDetail(w, db, question)
 	default:
 		handleDefaultDetail(w, question)
 	}
@@ -216,14 +234,56 @@ func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
 
 // Question functions //
 
-func handleFullDetail(w http.ResponseWriter, db *gorm.DB, id string, question models.Question) {
-	// Define a safe user response struct without sensitive fields
+// Updated handleFullDetail to work with either single or multiple questions
+func handleFullDetail(w http.ResponseWriter, db *gorm.DB, questions interface{}) {
+	switch q := questions.(type) {
+	case models.Question:
+		// Single question case
+		detail := getFullQuestionDetail(db, q)
+		sendResponse(w, detail)
+	case []models.Question:
+		// Multiple questions case
+		detailedQuestions := make([]interface{}, len(q))
+		for i, question := range q {
+			detailedQuestions[i] = getFullQuestionDetail(db, question)
+		}
+		sendResponse(w, detailedQuestions)
+	default:
+		http.Error(w, "Invalid question type", http.StatusInternalServerError)
+	}
+}
+
+// Similarly update handleInformationDetail
+func handleInformationDetail(w http.ResponseWriter, db *gorm.DB, questions interface{}) {
+	switch q := questions.(type) {
+	case models.Question:
+		// Single question case
+		info := getInformationQuestionDetail(db, q)
+		sendResponse(w, info)
+	case []models.Question:
+		// Multiple questions case
+		infoQuestions := make([]interface{}, len(q))
+		for i, question := range q {
+			infoQuestions[i] = getInformationQuestionDetail(db, question)
+		}
+		sendResponse(w, infoQuestions)
+	default:
+		http.Error(w, "Invalid question type", http.StatusInternalServerError)
+	}
+}
+
+func handleDefaultDetail(w http.ResponseWriter, question models.Question) {
+	fmt.Printf("Found question %s \n", question.ID)
+	sendResponse(w, question)
+}
+
+// Reusable functions from GetQuestion handler
+func getFullQuestionDetail(db *gorm.DB, question models.Question) interface{} {
 	type SafeUser struct {
 		ID   uint   `json:"id"`
 		Name string `json:"name"`
 	}
 
-	// Define the full question response struct
 	type QuestionDetail struct {
 		ID        uint             `json:"id"`
 		CreatedAt time.Time        `json:"created_at"`
@@ -237,16 +297,15 @@ func handleFullDetail(w http.ResponseWriter, db *gorm.DB, id string, question mo
 		Comments  []models.Comment `json:"comments"`
 	}
 
-	// Get related data
-	subject, subjectErr := getQuestionSubject(db, question.SubjectID)
-	topic, topicErr := getQuestionTopic(db, id)
-	source, sourceErr := getQuestionSource(db, id)
-	answers, _ := getQuestionAnswers(db, id)
-	comments, _ := getQuestionComments(db, id)
-	user, userErr := getQuestionUser(db, question.UserID)
+	questionID := strconv.FormatUint(uint64(question.ID), 10)
+	subject, _ := getQuestionSubject(db, question.SubjectID)
+	topic, _ := getQuestionTopic(db, questionID)
+	source, _ := getQuestionSource(db, questionID)
+	answers, _ := getQuestionAnswers(db, questionID)
+	comments, _ := getQuestionComments(db, questionID)
+	user, _ := getQuestionUser(db, question.UserID)
 
-	// Prepare the full response
-	fullResponse := QuestionDetail{
+	detail := QuestionDetail{
 		ID:        question.ID,
 		CreatedAt: question.CreatedAt,
 		UpdatedAt: question.UpdatedAt,
@@ -255,41 +314,31 @@ func handleFullDetail(w http.ResponseWriter, db *gorm.DB, id string, question mo
 		Comments:  comments,
 	}
 
-	// Only include subject if it was found
-	if subjectErr == nil {
-		fullResponse.Subject = subject
+	if subject != nil {
+		detail.Subject = subject
 	}
-
-	// Only include topic if it was found
-	if topicErr == nil {
-		fullResponse.Topic = topic
+	if topic != nil {
+		detail.Topic = topic
 	}
-
-	// Only include source if it was found AND has metadata
-	if sourceErr == nil && len(source.Metadata) > 0 {
-		fullResponse.Source = source
+	if source != nil && len(source.Metadata) > 0 {
+		detail.Source = source
 	}
-
-	// Only include user if it was found (without sensitive fields)
-	if userErr == nil {
-		fullResponse.User = &SafeUser{
+	if user != nil {
+		detail.User = &SafeUser{
 			ID:   user.ID,
 			Name: user.Name,
 		}
 	}
 
-	fmt.Printf("Found question with full detail %s \n", id)
-	sendResponse(w, fullResponse)
+	return detail
 }
 
-func handleInformationDetail(w http.ResponseWriter, db *gorm.DB, id string, question models.Question) {
-	// Define a safe user response struct without sensitive fields
+func getInformationQuestionDetail(db *gorm.DB, question models.Question) interface{} {
 	type SafeUser struct {
 		ID   uint   `json:"id"`
 		Name string `json:"name"`
 	}
 
-	// Define the information question response struct
 	type QuestionInfo struct {
 		ID        uint            `json:"id"`
 		CreatedAt time.Time       `json:"created_at"`
@@ -301,48 +350,34 @@ func handleInformationDetail(w http.ResponseWriter, db *gorm.DB, id string, ques
 		Source    *models.Source  `json:"source,omitempty"`
 	}
 
-	// Get related data (excluding answers and comments)
-	subject, subjectErr := getQuestionSubject(db, question.SubjectID)
-	topic, topicErr := getQuestionTopic(db, id)
-	source, sourceErr := getQuestionSource(db, id)
-	user, userErr := getQuestionUser(db, question.UserID)
+	questionID := strconv.FormatUint(uint64(question.ID), 10)
+	subject, _ := getQuestionSubject(db, question.SubjectID)
+	topic, _ := getQuestionTopic(db, questionID)
+	source, _ := getQuestionSource(db, questionID)
+	user, _ := getQuestionUser(db, question.UserID)
 
-	// Prepare the information response
-	infoResponse := QuestionInfo{
+	info := QuestionInfo{
 		ID:        question.ID,
 		CreatedAt: question.CreatedAt,
 		UpdatedAt: question.UpdatedAt,
 		Statement: question.Statement,
 	}
 
-	// Only include subject if it was found
-	if subjectErr == nil {
-		infoResponse.Subject = subject
+	if subject != nil {
+		info.Subject = subject
 	}
-
-	// Only include topic if it was found
-	if topicErr == nil {
-		infoResponse.Topic = topic
+	if topic != nil {
+		info.Topic = topic
 	}
-
-	// Only include source if it was found AND has metadata
-	if sourceErr == nil && len(source.Metadata) > 0 {
-		infoResponse.Source = source
+	if source != nil && len(source.Metadata) > 0 {
+		info.Source = source
 	}
-
-	// Only include user if it was found (without sensitive fields)
-	if userErr == nil {
-		infoResponse.User = &SafeUser{
+	if user != nil {
+		info.User = &SafeUser{
 			ID:   user.ID,
 			Name: user.Name,
 		}
 	}
 
-	fmt.Printf("Found question with information detail %s \n", id)
-	sendResponse(w, infoResponse)
-}
-
-func handleDefaultDetail(w http.ResponseWriter, question models.Question) {
-	fmt.Printf("Found question %s \n", question.ID)
-	sendResponse(w, question)
+	return info
 }
