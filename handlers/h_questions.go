@@ -136,7 +136,21 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 			handleFullDetail(w, db, questions)
 			return
 		case "information":
-			handleInformationDetail(w, db, questions)
+			infoQuestions := make([]interface{}, len(questions))
+			for i, question := range questions {
+				infoQuestions[i] = getInformationQuestionDetail(db, question)
+			}
+		
+			response := map[string]interface{}{
+				"data": infoQuestions,
+				"pagination": map[string]interface{}{
+					"total":        total,
+					"per_page":     limit,
+					"current_page": page,
+					"last_page":    int(math.Ceil(float64(total) / float64(limit))),
+				},
+			}
+			json.NewEncoder(w).Encode(response)
 			return
 		}
 	}
