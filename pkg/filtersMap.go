@@ -23,8 +23,9 @@ var QuestionFilters = map[string]FilterFunc{
 	"topic": func(value string, qb *gorm.DB) *gorm.DB {
 		return qb.Where("topic = ?", value)
 	},
-	"source_name": func(value string, qb *gorm.DB) *gorm.DB {
-		return qb.Where("source_name = ?", value)
+	"source": func(value string, qb *gorm.DB) *gorm.DB {
+		return qb.Joins("JOIN question_source ON question_source.question_id = question.id").
+			Where("question_source.source_id = ?", value)
 	},
 
 	"year": func(value string, qb *gorm.DB) *gorm.DB {
