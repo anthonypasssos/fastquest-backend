@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"gorm.io/gorm"
 )
 
@@ -75,4 +76,87 @@ func CreateQuestionSet(w http.ResponseWriter, r *http.Request) {
 	// Retorna o question set criado
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(questionSet)
+}
+
+func GetQuestionSet(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	db := database.GetDB()
+
+	var questionSet models.QuestionSet
+
+	result := db.First(&questionSet, id)
+	if result.Error != nil {
+		http.Error(w, fmt.Sprintf("Error fetching question set: %v", result.Error), http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(questionSet)
+}
+
+func GetQuestionsFromSet(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	db := database.GetDB()
+
+	// 1. Buscar as relações question_set_question
+	var links []models.QuestionSetQuestion
+	result := db.Where("question_set_id = ?", id).Order("position ASC").Find(&links)
+	if result.Error != nil {
+		http.Error(w, fmt.Sprintf("Error fetching question set links: %v", result.Error), http.StatusInternalServerError)
+		return
+	}
+
+	// Se não tiver questões associadas
+	if len(links) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]interface{}{})
+		return
+	}
+
+	// 2. Extrair os IDs das questões
+	var questionIDs []int
+	for _, link := range links {
+		questionIDs = append(questionIDs, link.QuestionID)
+	}
+
+	// 3. Buscar as questões no banco
+	var questions []models.Question
+	result = db.Where("id IN ?", questionIDs).Find(&questions)
+	if result.Error != nil {
+		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error), http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Retornar as questões
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(questions)
+}
+
+func GetQuestionIDsFromSet(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	db := database.GetDB()
+
+	// Buscar as relações question_set_question ordenadas pela posição
+	var links []models.QuestionSetQuestion
+	result := db.Where("question_set_id = ?", id).Order("position ASC").Find(&links)
+	if result.Error != nil {
+		http.Error(w, fmt.Sprintf("Error fetching question set links: %v", result.Error), http.StatusInternalServerError)
+		return
+	}
+
+	// Extrair os IDs das questões
+	var questionIDs []int
+	for _, link := range links {
+		questionIDs = append(questionIDs, link.QuestionID)
+	}
+
+	// Retornar como JSON
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(questionIDs)
 }
