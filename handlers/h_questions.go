@@ -140,7 +140,7 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 			for i, question := range questions {
 				infoQuestions[i] = getInformationQuestionDetail(db, question)
 			}
-		
+
 			response := map[string]interface{}{
 				"data": infoQuestions,
 				"pagination": map[string]interface{}{
@@ -212,6 +212,46 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type RequestIDs struct {
+	IDs []uint `json:"ids"`
+}
+
+func GetQuestionsByArray(w http.ResponseWriter, r *http.Request) {
+	var req RequestIDs
+
+	// Decodifica o JSON enviado no corpo da requisição
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		http.Error(w, "IDs array is required", http.StatusBadRequest)
+		return
+	}
+
+	db := database.GetDB()
+	if db == nil {
+		http.Error(w, "Database connection not established", http.StatusInternalServerError)
+		return
+	}
+
+	var questions []models.Question
+
+	// Busca todas as questões cujos IDs estão no array
+	result := db.Where("id IN ?", req.IDs).Find(&questions)
+	if result.Error != nil {
+		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error),
+			http.StatusInternalServerError)
+		return
+	}
+
+	// Retorna JSON com as questões encontradas
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(questions)
+}
+
 func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
@@ -243,8 +283,6 @@ func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Question ID %s deleted successfully", id)
 }
-
-
 
 // Question functions //
 
