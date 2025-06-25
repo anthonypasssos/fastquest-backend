@@ -5,7 +5,9 @@ import (
 	"flashquest/database"
 	"flashquest/pkg/models"
 	"fmt"
+	"math"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
@@ -159,4 +161,89 @@ func GetQuestionIDsFromSet(w http.ResponseWriter, r *http.Request) {
 	// Retornar como JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(questionIDs)
+}
+
+func GetLists(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	// Paginação
+	page, _ := strconv.Atoi(query.Get("page"))
+	if page < 1 {
+		page = 1
+	}
+
+	limit, _ := strconv.Atoi(query.Get("limit"))
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	// Ordenação segura
+	orderBy := query.Get("order_by")
+	allowedOrders := map[string]bool{
+		"creation_date desc": true,
+		"creation_date asc":  true,
+		"name asc":           true,
+		"name desc":          true,
+	}
+	if !allowedOrders[orderBy] {
+		orderBy = "creation_date desc"
+	}
+
+	db := database.GetDB()
+	if db == nil {
+		http.Error(w, "Database connection not established", http.StatusInternalServerError)
+		return
+	}
+
+	queryBuilder := db.Model(&models.QuestionSet{})
+
+	// Filtro user_id (convertendo para int)
+	if userId := query.Get("user_id"); userId != "" {
+		uid, err := strconv.Atoi(userId)
+		if err != nil {
+			http.Error(w, "Invalid user_id", http.StatusBadRequest)
+			return
+		}
+		queryBuilder = queryBuilder.Where("user_id = ?", uid)
+	}
+
+	// Filtro is_private (convertendo para bool)
+	if isPrivate := query.Get("is_private"); isPrivate != "" {
+		private, err := strconv.ParseBool(isPrivate)
+		if err != nil {
+			http.Error(w, "Invalid is_private value", http.StatusBadRequest)
+			return
+		}
+		queryBuilder = queryBuilder.Where("is_private = ?", private)
+	}
+
+	// Execução da query
+	var total int64
+	if err := queryBuilder.Count(&total).Error; err != nil {
+		http.Error(w, fmt.Sprintf("Error counting lists: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	offset := (page - 1) * limit
+	var lists []models.QuestionSet
+	result := queryBuilder.Order(orderBy).Offset(offset).Limit(limit).Find(&lists)
+
+	if result.Error != nil {
+		http.Error(w, fmt.Sprintf("Error fetching lists: %v", result.Error), http.StatusInternalServerError)
+		return
+	}
+
+	// Resposta
+	response := map[string]interface{}{
+		"data": lists,
+		"pagination": map[string]interface{}{
+			"total":        total,
+			"per_page":     limit,
+			"current_page": page,
+			"last_page":    int(math.Ceil(float64(total) / float64(limit))),
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }

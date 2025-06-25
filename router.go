@@ -46,7 +46,9 @@ func registerPaths(r *mux.Router) {
 
 	//Question Set Requests
 	r.HandleFunc("/question-set", handlers.CreateQuestionSet).Methods("POST")
+	r.HandleFunc("/question-sets", handlers.GetLists).Methods("GET")
 	r.HandleFunc("/question-set/{id}", handlers.GetQuestionSet).Methods("GET")
 	r.HandleFunc("/question-set/{id}/questions", handlers.GetQuestionsFromSet).Methods("GET")
 	r.HandleFunc("/question-set/{id}/question-ids", handlers.GetQuestionIDsFromSet).Methods("GET")
+
 }
