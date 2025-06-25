@@ -37,7 +37,10 @@ func InitDB() *gorm.DB {
 
 	log.Println(dsn)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(postgres.New(postgres.Config{
+		DSN:                  dsn,
+		PreferSimpleProtocol: true, // <-- evita erro prepared statement does not exist
+	}), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Warn),
 	})
 
