@@ -60,6 +60,5 @@ INSERT INTO answer (text, is_correct, id_question) VALUES
 
 -- +goose Down
 -- +goose StatementBegin
-DELETE FROM users;
-DELETE FROM subject;
+TRUNCATE TABLE answer, question, subject, users RESTART IDENTITY CASCADE;
 -- +goose StatementEnd
