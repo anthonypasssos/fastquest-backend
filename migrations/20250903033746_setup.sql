@@ -99,5 +99,5 @@ CREATE TABLE comment_relationship (
 
 -- +goose Down
 -- +goose StatementBegin
-DROP TABLE users, subject, question, source, question_source, topic, question_topic, answer, question_set, question_set_question, user_response, comment, comment_relationship;
+DROP TABLE IF EXISTS users, subject, question, source, question_source, topic, question_topic, answer, question_set, question_set_question, user_response, comment, comment_relationship CASCADE;
 -- +goose StatementEnd
