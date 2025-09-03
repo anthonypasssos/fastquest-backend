@@ -45,7 +45,7 @@ CREATE TABLE topic (
 CREATE TABLE question_topic (
     id SERIAL PRIMARY KEY,
     question_id INT REFERENCES question(id),
-    topic INT REFERENCES topic(id)
+    topic_id INT REFERENCES topic(id)
 );
 
 CREATE TABLE answer (

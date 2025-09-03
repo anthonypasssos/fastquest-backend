@@ -14,12 +14,12 @@ import (
 )
 
 type NewList struct {
-	Name      string `json:"name"`
-	Type      string `json:"type"`
-	Desc      string `json:"desc"`
-	IsPrivate bool   `json:"is_private"`
-	UserID    int    `json:"user_id"`
-	Questions []int  `json:"questions"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	IsPrivate   bool   `json:"is_private"`
+	UserID      int    `json:"user_id"`
+	Questions   []int  `json:"questions"`
 }
 
 func CreateQuestionSet(w http.ResponseWriter, r *http.Request) {
@@ -40,11 +40,11 @@ func CreateQuestionSet(w http.ResponseWriter, r *http.Request) {
 
 	// Cria o question set
 	questionSet := models.QuestionSet{
-		Name:      newList.Name,
-		Type:      newList.Type,
-		Desc:      newList.Desc,
-		UserID:    newList.UserID,
-		IsPrivate: newList.IsPrivate,
+		Name:        newList.Name,
+		Type:        newList.Type,
+		Description: newList.Description,
+		UserID:      newList.UserID,
+		IsPrivate:   newList.IsPrivate,
 	}
 
 	// Inicia uma transação

@@ -7,7 +7,7 @@ import (
 type QuestionSet struct {
 	ID           int       `json:"id" gorm:"primaryKey;autoIncrement"`
 	Name         string    `json:"name"`
-	Desc         string    `json:"desc"`
+	Description  string    `json:"description"`
 	Type         string    `json:"type"`
 	UserID       int       `json:"user_id"`
 	CreationDate time.Time `json:"creation_date" gorm:"autoCreateTime"`
