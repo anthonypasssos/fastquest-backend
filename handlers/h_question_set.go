@@ -197,7 +197,7 @@ func GetLists(w http.ResponseWriter, r *http.Request) {
 
 	queryBuilder := db.Model(&models.QuestionSet{})
 
-	// Filtro user_id (convertendo para int)
+	// 🔸 Filtro user_id
 	if userId := query.Get("user_id"); userId != "" {
 		uid, err := strconv.Atoi(userId)
 		if err != nil {
@@ -207,7 +207,7 @@ func GetLists(w http.ResponseWriter, r *http.Request) {
 		queryBuilder = queryBuilder.Where("user_id = ?", uid)
 	}
 
-	// Filtro is_private (convertendo para bool)
+	// 🔸 Filtro is_private
 	if isPrivate := query.Get("is_private"); isPrivate != "" {
 		private, err := strconv.ParseBool(isPrivate)
 		if err != nil {
@@ -217,7 +217,16 @@ func GetLists(w http.ResponseWriter, r *http.Request) {
 		queryBuilder = queryBuilder.Where("is_private = ?", private)
 	}
 
-	// Execução da query
+	// 🔍 Filtro de busca por nome ou descrição
+	if search := query.Get("statement"); search != "" {
+		likeSearch := fmt.Sprintf("%%%s%%", search)
+		queryBuilder = queryBuilder.Where(
+			"(LOWER(name) LIKE LOWER(?) OR LOWER(desc) LIKE LOWER(?))",
+			likeSearch, likeSearch,
+		)
+	}
+
+	// Conta total para paginação
 	var total int64
 	if err := queryBuilder.Count(&total).Error; err != nil {
 		http.Error(w, fmt.Sprintf("Error counting lists: %v", err), http.StatusInternalServerError)
