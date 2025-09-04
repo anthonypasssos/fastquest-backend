@@ -20,6 +20,15 @@ import (
 	"gorm.io/gorm"
 )
 
+// CreateQuestion godoc
+// @Summary Cria uma nova questão
+// @Description Recebe uma questão e salva no banco
+// @Tags questions
+// @Accept json
+// @Produce json
+// @Param question body models.QuestionDoc true "Question"
+// @Success 201 {object} models.QuestionDoc
+// @Router /question/create [post]
 func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Creating question")
 
@@ -70,6 +79,18 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(question)
 }
 
+// GetQuestions godoc
+// @Summary Retorna todas as questões
+// @Description Retorna todas as questões com paginação
+// @Tags questions
+// @Accept json
+// @Produce json
+// @Param page query int false "Número da página"
+// @Param limit query int false "Número de itens por página (máx 100)"
+// @Param order_by query string false "Ordenação, ex: created_at desc"
+// @Param detail query string false "Nível de detalhe: full ou information"
+// @Success 200 {object} models.QuestionListResponse
+// @Router /questions [get]
 func GetQuestions(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 

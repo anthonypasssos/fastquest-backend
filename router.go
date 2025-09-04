@@ -9,6 +9,10 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
+
+	_ "flashquest/docs"
+
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func NewServer() *http.Server {
@@ -51,4 +55,5 @@ func registerPaths(r *mux.Router) {
 	r.HandleFunc("/question-set/{id}/questions", handlers.GetQuestionsFromSet).Methods("GET")
 	r.HandleFunc("/question-set/{id}/question-ids", handlers.GetQuestionIDsFromSet).Methods("GET")
 
+	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 }

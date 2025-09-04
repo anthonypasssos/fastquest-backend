@@ -1,0 +1,122 @@
+basePath: /
+definitions:
+  models.Pagination:
+    properties:
+      current_page:
+        type: integer
+      last_page:
+        type: integer
+      per_page:
+        type: integer
+      total:
+        type: integer
+    type: object
+  models.QuestionDoc:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      sources:
+        items:
+          $ref: '#/definitions/models.SourceDoc'
+        type: array
+      statement:
+        type: string
+      subject_id:
+        type: integer
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  models.QuestionListResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.QuestionDoc'
+        type: array
+      pagination:
+        $ref: '#/definitions/models.Pagination'
+    type: object
+  models.SourceDoc:
+    properties:
+      id:
+        type: integer
+      metadata:
+        additionalProperties: true
+        type: object
+      name:
+        type: string
+      type:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a sample server Petstore server.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: FastQuest API
+  version: "1.0"
+paths:
+  /question/create:
+    post:
+      consumes:
+      - application/json
+      description: Recebe uma questão e salva no banco
+      parameters:
+      - description: Question
+        in: body
+        name: question
+        required: true
+        schema:
+          $ref: '#/definitions/models.QuestionDoc'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.QuestionDoc'
+      summary: Cria uma nova questão
+      tags:
+      - questions
+  /questions:
+    get:
+      consumes:
+      - application/json
+      description: Retorna todas as questões com paginação
+      parameters:
+      - description: Número da página
+        in: query
+        name: page
+        type: integer
+      - description: Número de itens por página (máx 100)
+        in: query
+        name: limit
+        type: integer
+      - description: 'Ordenação, ex: created_at desc'
+        in: query
+        name: order_by
+        type: string
+      - description: 'Nível de detalhe: full ou information'
+        in: query
+        name: detail
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.QuestionListResponse'
+      summary: Retorna todas as questões
+      tags:
+      - questions
+swagger: "2.0"
