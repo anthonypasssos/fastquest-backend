@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	filters "flashquest/pkg"
-
 	"time"
 
 	"math"
@@ -20,45 +19,50 @@ import (
 	"gorm.io/gorm"
 )
 
-// CreateQuestion godoc
-// @Summary Cria uma nova questão
-// @Description Recebe uma questão e salva no banco
-// @Tags questions
-// @Accept json
-// @Produce json
-// @Param question body models.QuestionDoc true "Question"
-// @Success 201 {object} models.QuestionDoc
-// @Router /question/create [post]
-func CreateQuestion(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Creating question")
+type SafeUser struct {
+	ID   uint   `json:"id"`
+	Name string `json:"name"`
+}
 
-	var questionInput struct {
+type QuestionDetail struct {
+	ID        uint             `json:"id"`
+	CreatedAt time.Time        `json:"created_at"`
+	UpdatedAt time.Time        `json:"updated_at"`
+	Statement string           `json:"statement"`
+	Subject   *models.Subject  `json:"subject,omitempty"`
+	Topic     *models.Topic    `json:"topic,omitempty"`
+	User      *SafeUser        `json:"user,omitempty"`
+	Source    *models.Source   `json:"source,omitempty"`
+	Answers   []models.Answer  `json:"answers"`
+	Comments  []models.Comment `json:"comments"`
+}
+
+type QuestionInfo struct {
+	ID        uint            `json:"id"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+	Statement string          `json:"statement"`
+	Subject   *models.Subject `json:"subject,omitempty"`
+	Topic     *models.Topic   `json:"topic,omitempty"`
+	User      *SafeUser       `json:"user,omitempty"`
+	Source    *models.Source  `json:"source,omitempty"`
+}
+
+func CreateQuestion(w http.ResponseWriter, r *http.Request) {
+	var input struct {
 		Statement string `json:"statement"`
 		SubjectID int    `json:"subject_id"`
 		UserID    int    `json:"user_id"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&questionInput); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if questionInput.Statement == "" {
-		http.Error(w, "Statement is required", http.StatusBadRequest)
+	if input.Statement == "" || input.UserID == 0 {
+		http.Error(w, "Statement and User ID are required", http.StatusBadRequest)
 		return
-	}
-
-	if questionInput.UserID == 0 {
-		http.Error(w, "User ID is required", http.StatusBadRequest)
-		return
-	}
-
-	question := models.Question{
-		Statement: questionInput.Statement,
-		SubjectID: questionInput.SubjectID,
-		UserID:    questionInput.UserID,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
 	}
 
 	db := database.GetDB()
@@ -67,51 +71,35 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := db.Create(&question)
-	if result.Error != nil {
-		http.Error(w, fmt.Sprintf("Error creating question: %v", result.Error),
-			http.StatusInternalServerError)
+	question := models.Question{
+		Statement: input.Statement,
+		SubjectID: input.SubjectID,
+		UserID:    input.UserID,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+
+	if result := db.Create(&question); result.Error != nil {
+		http.Error(w, fmt.Sprintf("Error creating question: %v", result.Error), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(question)
+	sendJSON(w, question, http.StatusCreated)
 }
 
-// GetQuestions godoc
-// @Summary Retorna todas as questões
-// @Description Retorna todas as questões com paginação
-// @Tags questions
-// @Accept json
-// @Produce json
-// @Param page query int false "Número da página"
-// @Param limit query int false "Número de itens por página (máx 100)"
-// @Param order_by query string false "Ordenação, ex: created_at desc"
-// @Param detail query string false "Nível de detalhe: full ou information"
-// @Success 200 {object} models.QuestionListResponse
-// @Router /questions [get]
 func GetQuestions(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-
-	// Pagination
-	page, err := strconv.Atoi(query.Get("page"))
-	if err != nil || page < 1 {
-		page = 1
+	page := parseInt(query.Get("page"), 1)
+	limit := parseInt(query.Get("limit"), 10)
+	if limit > 100 {
+		limit = 100
 	}
 
-	limit, err := strconv.Atoi(query.Get("limit"))
-	if err != nil || limit < 1 || limit > 100 {
-		limit = 10
-	}
-
-	// Ordering
 	orderBy := query.Get("order_by")
 	if orderBy == "" {
 		orderBy = "created_at desc"
 	}
 
-	// Detail level
 	detail := query.Get("detail")
 
 	db := database.GetDB()
@@ -120,82 +108,37 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	queryBuilder := db.Model(&models.Question{})
-
-	for param, handler := range filters.QuestionFilters {
-		if value := query.Get(param); value != "" {
-			queryBuilder = handler(value, queryBuilder)
-		}
-	}
-
+	queryBuilder := applyFilters(db.Model(&models.Question{}), query)
 	queryBuilder = queryBuilder.Order(orderBy)
 
 	var total int64
 	if err := queryBuilder.Count(&total).Error; err != nil {
-		http.Error(w, fmt.Sprintf("Error counting questions: %v", err),
-			http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Error counting questions: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	offset := (page - 1) * limit
 	var questions []models.Question
-	result := queryBuilder.Offset(offset).Limit(limit).Find(&questions)
-
-	if result.Error != nil {
-		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error),
-			http.StatusInternalServerError)
+	offset := (page - 1) * limit
+	if result := queryBuilder.Offset(offset).Limit(limit).Find(&questions); result.Error != nil {
+		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error), http.StatusInternalServerError)
 		return
 	}
 
-	// Handle response based on detail level
-	w.Header().Set("Content-Type", "application/json")
-
-	if detail != "" {
-		// For detailed responses, we need to handle pagination separately
-		switch detail {
-		case "full":
-			handleFullDetail(w, db, questions)
-			return
-		case "information":
-			infoQuestions := make([]interface{}, len(questions))
-			for i, question := range questions {
-				infoQuestions[i] = getInformationQuestionDetail(db, question)
-			}
-
-			response := map[string]interface{}{
-				"data": infoQuestions,
-				"pagination": map[string]interface{}{
-					"total":        total,
-					"per_page":     limit,
-					"current_page": page,
-					"last_page":    int(math.Ceil(float64(total) / float64(limit))),
-				},
-			}
-			json.NewEncoder(w).Encode(response)
-			return
-		}
+	var responseData interface{}
+	switch detail {
+	case "full":
+		responseData = buildDetailedQuestions(db, questions)
+	case "information":
+		responseData = buildInfoQuestions(db, questions)
+	default:
+		responseData = questions
 	}
 
-	// Default response with pagination
-	response := map[string]interface{}{
-		"data": questions,
-		"pagination": map[string]interface{}{
-			"total":        total,
-			"per_page":     limit,
-			"current_page": page,
-			"last_page":    int(math.Ceil(float64(total) / float64(limit))),
-		},
-	}
-
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Error encoding response", http.StatusInternalServerError)
-	}
+	sendPaginatedResponse(w, responseData, total, limit, page)
 }
 
 func GetQuestion(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
-
+	id := mux.Vars(r)["id"]
 	if id == "" {
 		http.Error(w, "ID parameter is required", http.StatusBadRequest)
 		return
@@ -208,47 +151,33 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var question models.Question
-	result := db.Where("id = ?", id).First(&question)
-
-	if result.Error != nil {
+	if result := db.Where("id = ?", id).First(&question); result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			http.Error(w, "Question not found", http.StatusNotFound)
 		} else {
-			http.Error(w, fmt.Sprintf("Error fetching question: %v", result.Error),
-				http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Error fetching question: %v", result.Error), http.StatusInternalServerError)
 		}
 		return
 	}
 
-	query := r.URL.Query()
-	detail := query.Get("detail")
-
+	detail := r.URL.Query().Get("detail")
 	switch detail {
 	case "full":
-		handleFullDetail(w, db, question)
+		sendJSON(w, getFullQuestionDetail(db, question), http.StatusOK)
 	case "information":
-		handleInformationDetail(w, db, question)
+		sendJSON(w, getInformationQuestionDetail(db, question), http.StatusOK)
 	default:
-		handleDefaultDetail(w, question)
+		sendJSON(w, question, http.StatusOK)
 	}
-}
-
-type RequestIDs struct {
-	IDs []uint `json:"ids"`
 }
 
 func GetQuestionsByArray(w http.ResponseWriter, r *http.Request) {
-	var req RequestIDs
-
-	// Decodifica o JSON enviado no corpo da requisição
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
-		return
+	var req struct {
+		IDs []uint `json:"ids"`
 	}
 
-	if len(req.IDs) == 0 {
-		http.Error(w, "IDs array is required", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || len(req.IDs) == 0 {
+		http.Error(w, "Invalid JSON body or empty IDs array", http.StatusBadRequest)
 		return
 	}
 
@@ -259,24 +188,16 @@ func GetQuestionsByArray(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var questions []models.Question
-
-	// Busca todas as questões cujos IDs estão no array
-	result := db.Where("id IN ?", req.IDs).Find(&questions)
-	if result.Error != nil {
-		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error),
-			http.StatusInternalServerError)
+	if result := db.Where("id IN ?", req.IDs).Find(&questions); result.Error != nil {
+		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error), http.StatusInternalServerError)
 		return
 	}
 
-	// Retorna JSON com as questões encontradas
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(questions)
+	sendJSON(w, questions, http.StatusOK)
 }
 
 func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
-
+	id := mux.Vars(r)["id"]
 	if id == "" {
 		http.Error(w, "ID parameter is required", http.StatusBadRequest)
 		return
@@ -289,11 +210,10 @@ func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Attempting to delete question ID: %s", id)
-
 	result := db.Delete(&models.Question{}, id)
+
 	if result.Error != nil {
-		http.Error(w, fmt.Sprintf("Error deleting question: %v", result.Error),
-			http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Error deleting question: %v", result.Error), http.StatusInternalServerError)
 		return
 	}
 
@@ -305,71 +225,32 @@ func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Question ID %s deleted successfully", id)
 }
 
-// Question functions //
-
-// Updated handleFullDetail to work with either single or multiple questions
-func handleFullDetail(w http.ResponseWriter, db *gorm.DB, questions interface{}) {
-	switch q := questions.(type) {
-	case models.Question:
-		// Single question case
-		detail := getFullQuestionDetail(db, q)
-		sendResponse(w, detail)
-	case []models.Question:
-		// Multiple questions case
-		detailedQuestions := make([]interface{}, len(q))
-		for i, question := range q {
-			detailedQuestions[i] = getFullQuestionDetail(db, question)
+func applyFilters(query *gorm.DB, params map[string][]string) *gorm.DB {
+	for param, handler := range filters.QuestionFilters {
+		if values, exists := params[param]; exists && len(values) > 0 && values[0] != "" {
+			query = handler(values[0], query)
 		}
-		sendResponse(w, detailedQuestions)
-	default:
-		http.Error(w, "Invalid question type", http.StatusInternalServerError)
 	}
+	return query
 }
 
-// Similarly update handleInformationDetail
-func handleInformationDetail(w http.ResponseWriter, db *gorm.DB, questions interface{}) {
-	switch q := questions.(type) {
-	case models.Question:
-		// Single question case
-		info := getInformationQuestionDetail(db, q)
-		sendResponse(w, info)
-	case []models.Question:
-		// Multiple questions case
-		infoQuestions := make([]interface{}, len(q))
-		for i, question := range q {
-			infoQuestions[i] = getInformationQuestionDetail(db, question)
-		}
-		sendResponse(w, infoQuestions)
-	default:
-		http.Error(w, "Invalid question type", http.StatusInternalServerError)
+func buildDetailedQuestions(db *gorm.DB, questions []models.Question) []interface{} {
+	result := make([]interface{}, len(questions))
+	for i, q := range questions {
+		result[i] = getFullQuestionDetail(db, q)
 	}
+	return result
 }
 
-func handleDefaultDetail(w http.ResponseWriter, question models.Question) {
-	fmt.Printf("Found question %s \n", question.ID)
-	sendResponse(w, question)
+func buildInfoQuestions(db *gorm.DB, questions []models.Question) []interface{} {
+	result := make([]interface{}, len(questions))
+	for i, q := range questions {
+		result[i] = getInformationQuestionDetail(db, q)
+	}
+	return result
 }
 
-// Reusable functions from GetQuestion handler
 func getFullQuestionDetail(db *gorm.DB, question models.Question) interface{} {
-	type SafeUser struct {
-		ID   uint   `json:"id"`
-		Name string `json:"name"`
-	}
-
-	type QuestionDetail struct {
-		ID        uint             `json:"id"`
-		CreatedAt time.Time        `json:"created_at"`
-		UpdatedAt time.Time        `json:"updated_at"`
-		Statement string           `json:"statement"`
-		Subject   *models.Subject  `json:"subject,omitempty"`
-		Topic     *models.Topic    `json:"topic,omitempty"`
-		User      *SafeUser        `json:"user,omitempty"`
-		Source    *models.Source   `json:"source,omitempty"`
-		Answers   []models.Answer  `json:"answers"`
-		Comments  []models.Comment `json:"comments"`
-	}
-
 	questionID := strconv.FormatUint(uint64(question.ID), 10)
 	subject, _ := getQuestionSubject(db, question.SubjectID)
 	topic, _ := getQuestionTopic(db, questionID)
@@ -385,44 +266,21 @@ func getFullQuestionDetail(db *gorm.DB, question models.Question) interface{} {
 		Statement: question.Statement,
 		Answers:   answers,
 		Comments:  comments,
+		Subject:   subject,
+		Topic:     topic,
 	}
 
-	if subject != nil {
-		detail.Subject = subject
-	}
-	if topic != nil {
-		detail.Topic = topic
-	}
 	if source != nil && len(source.Metadata) > 0 {
 		detail.Source = source
 	}
 	if user != nil {
-		detail.User = &SafeUser{
-			ID:   user.ID,
-			Name: user.Name,
-		}
+		detail.User = &SafeUser{ID: user.ID, Name: user.Name}
 	}
 
 	return detail
 }
 
 func getInformationQuestionDetail(db *gorm.DB, question models.Question) interface{} {
-	type SafeUser struct {
-		ID   uint   `json:"id"`
-		Name string `json:"name"`
-	}
-
-	type QuestionInfo struct {
-		ID        uint            `json:"id"`
-		CreatedAt time.Time       `json:"created_at"`
-		UpdatedAt time.Time       `json:"updated_at"`
-		Statement string          `json:"statement"`
-		Subject   *models.Subject `json:"subject,omitempty"`
-		Topic     *models.Topic   `json:"topic,omitempty"`
-		User      *SafeUser       `json:"user,omitempty"`
-		Source    *models.Source  `json:"source,omitempty"`
-	}
-
 	questionID := strconv.FormatUint(uint64(question.ID), 10)
 	subject, _ := getQuestionSubject(db, question.SubjectID)
 	topic, _ := getQuestionTopic(db, questionID)
@@ -434,23 +292,44 @@ func getInformationQuestionDetail(db *gorm.DB, question models.Question) interfa
 		CreatedAt: question.CreatedAt,
 		UpdatedAt: question.UpdatedAt,
 		Statement: question.Statement,
+		Subject:   subject,
+		Topic:     topic,
 	}
 
-	if subject != nil {
-		info.Subject = subject
-	}
-	if topic != nil {
-		info.Topic = topic
-	}
 	if source != nil && len(source.Metadata) > 0 {
 		info.Source = source
 	}
 	if user != nil {
-		info.User = &SafeUser{
-			ID:   user.ID,
-			Name: user.Name,
-		}
+		info.User = &SafeUser{ID: user.ID, Name: user.Name}
 	}
 
 	return info
+}
+
+func sendJSON(w http.ResponseWriter, data interface{}, statusCode int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+	}
+}
+
+func sendPaginatedResponse(w http.ResponseWriter, data interface{}, total int64, limit, page int) {
+	response := map[string]interface{}{
+		"data": data,
+		"pagination": map[string]interface{}{
+			"total":        total,
+			"per_page":     limit,
+			"current_page": page,
+			"last_page":    int(math.Ceil(float64(total) / float64(limit))),
+		},
+	}
+	sendJSON(w, response, http.StatusOK)
+}
+
+func parseInt(value string, defaultValue int) int {
+	if result, err := strconv.Atoi(value); err == nil && result > 0 {
+		return result
+	}
+	return defaultValue
 }
