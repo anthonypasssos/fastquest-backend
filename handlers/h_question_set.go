@@ -221,7 +221,7 @@ func GetLists(w http.ResponseWriter, r *http.Request) {
 	if search := query.Get("statement"); search != "" {
 		likeSearch := fmt.Sprintf("%%%s%%", search)
 		queryBuilder = queryBuilder.Where(
-			"(LOWER(name) LIKE LOWER(?) OR LOWER(desc) LIKE LOWER(?))",
+			"(LOWER(name) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?))",
 			likeSearch, likeSearch,
 		)
 	}

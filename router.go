@@ -38,22 +38,22 @@ func NewServer() *http.Server {
 
 func registerPaths(r *mux.Router) {
 	// Question Requests
-	r.HandleFunc("/question/create", handlers.CreateQuestion).Methods("POST") //Updated
+	r.HandleFunc("/questions", handlers.CreateQuestion).Methods("POST") //Updated
 	r.HandleFunc("/questions", handlers.GetQuestions).Methods("GET")
 	r.HandleFunc("/questions/array", handlers.GetQuestionsByArray).Methods("POST")
-	r.HandleFunc("/question/{id}", handlers.GetQuestion).Methods("GET")
-	r.HandleFunc("/question/{id}/delete", handlers.DeleteQuestion).Methods("DELETE")
+	r.HandleFunc("/questions/{id}", handlers.GetQuestion).Methods("GET")
+	r.HandleFunc("/questions/{id}", handlers.DeleteQuestion).Methods("DELETE")
 
 	// Answer Requests
-	r.HandleFunc("/question/{id}/answer/create", handlers.PostAnswers).Methods("POST")
-	r.HandleFunc("/question/{id}/answers", handlers.GetAnswers).Methods("GET")
+	r.HandleFunc("/questions/{id}/answers", handlers.PostAnswers).Methods("POST")
+	r.HandleFunc("/questions/{id}/answers", handlers.GetAnswers).Methods("GET")
 
 	//Question Set Requests
-	r.HandleFunc("/question-set", handlers.CreateQuestionSet).Methods("POST")
+	r.HandleFunc("/question-sets", handlers.CreateQuestionSet).Methods("POST")
 	r.HandleFunc("/question-sets", handlers.GetLists).Methods("GET")
-	r.HandleFunc("/question-set/{id}", handlers.GetQuestionSet).Methods("GET")
-	r.HandleFunc("/question-set/{id}/questions", handlers.GetQuestionsFromSet).Methods("GET")
-	r.HandleFunc("/question-set/{id}/question-ids", handlers.GetQuestionIDsFromSet).Methods("GET")
+	r.HandleFunc("/question-sets/{id}", handlers.GetQuestionSet).Methods("GET")
+	r.HandleFunc("/question-sets/{id}/questions", handlers.GetQuestionsFromSet).Methods("GET")
+	r.HandleFunc("/question-sets/{id}/question-ids", handlers.GetQuestionIDsFromSet).Methods("GET")
 
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 }
