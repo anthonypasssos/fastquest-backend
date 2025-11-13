@@ -48,6 +48,78 @@ type QuestionInfo struct {
 	Source    *models.Source  `json:"source,omitempty"`
 }
 
+type QuestionInput struct {
+	Statement string `json:"statement"`
+	SubjectID int    `json:"subject_id"`
+	UserID    int    `json:"user_id"`
+}
+
+func CreateQuestion(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		return
+	}
+
+	var questionsToProcess []QuestionInput
+	var createdQuestions []models.Question 
+
+	var questionArray []QuestionInput
+	errArray := json.Unmarshal(body, &questionArray)
+
+	if errArray == nil && len(questionArray) > 0 {
+		questionsToProcess = questionArray
+	} else {
+		var singleQuestion QuestionInput
+		errSingle := json.Unmarshal(body, &singleQuestion)
+
+		if errSingle == nil && (singleQuestion.Statement != "" || singleQuestion.UserID != 0) {
+			questionsToProcess = []QuestionInput{singleQuestion}
+		} else {
+			http.Error(w, "Invalid request body format: expected single question object or non-empty array of objects", http.StatusBadRequest)
+			return
+		}
+	}
+
+	db := database.GetDB()
+	if db == nil {
+		http.Error(w, "Database connection not established", http.StatusInternalServerError)
+		return
+	}
+
+	for _, input := range questionsToProcess {
+		if input.Statement == "" || input.UserID == 0 {
+			if len(questionsToProcess) > 1 {
+				http.Error(w, "One or more questions are missing Statement or User ID in the batch request", http.StatusBadRequest)
+				return
+			}
+			http.Error(w, "Statement and User ID are required", http.StatusBadRequest)
+			return
+		}
+
+		question := models.Question{
+			Statement: input.Statement,
+			SubjectID: input.SubjectID,
+			UserID:    input.UserID,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+
+		if result := db.Create(&question); result.Error != nil {
+			http.Error(w, fmt.Sprintf("Error creating question: %v", result.Error), http.StatusInternalServerError)
+			return
+		}
+		createdQuestions = append(createdQuestions, question)
+	}
+
+	if len(createdQuestions) == 1 && len(questionsToProcess) == 1 {
+		sendJSON(w, createdQuestions[0], http.StatusCreated)
+	} else {
+		sendJSON(w, createdQuestions, http.StatusCreated)
+	}
+}
+
+/*
 func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Statement string `json:"statement"`
@@ -85,7 +157,7 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendJSON(w, question, http.StatusCreated)
-}
+}*/
 
 func GetQuestions(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
