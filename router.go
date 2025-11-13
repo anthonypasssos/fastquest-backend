@@ -53,7 +53,6 @@ func registerPaths(r *mux.Router) {
 	r.HandleFunc("/question-sets", handlers.GetLists).Methods("GET")
 	r.HandleFunc("/question-sets/{id}", handlers.GetQuestionSet).Methods("GET")
 	r.HandleFunc("/question-sets/{id}/questions", handlers.GetQuestionsFromSet).Methods("GET")
-	r.HandleFunc("/question-sets/{id}/question-ids", handlers.GetQuestionIDsFromSet).Methods("GET")
-
+	
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 }

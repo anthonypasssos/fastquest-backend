@@ -104,7 +104,9 @@ func GetQuestionsFromSet(w http.ResponseWriter, r *http.Request) {
 
 	db := database.GetDB()
 
-	// 1. Buscar as relações question_set_question
+	query := r.URL.Query()
+	returnIDs := query.Get("fields") == "id"
+
 	var links []models.QuestionSetQuestion
 	result := db.Where("question_set_id = ?", id).Order("position ASC").Find(&links)
 	if result.Error != nil {
@@ -125,20 +127,22 @@ func GetQuestionsFromSet(w http.ResponseWriter, r *http.Request) {
 		questionIDs = append(questionIDs, link.QuestionID)
 	}
 
-	// 3. Buscar as questões no banco
-	var questions []models.Question
-	result = db.Where("id IN ?", questionIDs).Find(&questions)
-	if result.Error != nil {
-		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error), http.StatusInternalServerError)
-		return
-	}
-
-	// 4. Retornar as questões
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(questions)
+	if returnIDs {
+		json.NewEncoder(w).Encode(questionIDs)
+	} else {
+		// 3. Buscar as questões no banco
+		var questions []models.Question
+		result = db.Where("id IN ?", questionIDs).Find(&questions)
+		if result.Error != nil {
+			http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(questions)
+	}
 }
 
-func GetQuestionIDsFromSet(w http.ResponseWriter, r *http.Request) {
+/*func GetQuestionIDsFromSet(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
@@ -161,7 +165,7 @@ func GetQuestionIDsFromSet(w http.ResponseWriter, r *http.Request) {
 	// Retornar como JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(questionIDs)
-}
+}*/
 
 func GetLists(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
