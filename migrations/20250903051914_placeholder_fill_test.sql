@@ -4,7 +4,8 @@ INSERT INTO users (id, name, email, password_hash) VALUES
 (1, 'Beatrice Yure', 'bea.yure@gmail.com', 'TKATRTKVAEAD'),
 (2, 'Davi Pingado', 'pingado.davi.tsun@gmail.com', 'YSETHBS'),
 (3, 'Guilherme Ashevale', 'guilherme.ashevale@gmail.com', 'VWARAKFRYW'),
-(4, 'Beatriz Dere', 'beatriz.dere@gmail.com', 'VEABIYRYUIB');
+(4, 'Beatriz Dere', 'beatriz.dere@gmail.com', 'VEABIYRYUIB'),
+(5, 'FlashAi', 'gemini.flashquest@gmail.com', 'HFHEOHDODHWOQIHD');
 
 INSERT INTO subject (id, name) VALUES
 (1, 'Direito Constitucional'),
@@ -12,7 +13,8 @@ INSERT INTO subject (id, name) VALUES
 (3, 'Direito Civil'),
 (4, 'Direito Administrativo'),
 (5, 'Direito do Trabalho'),
-(6, 'Direito Tributário');
+(6, 'Direito Tributário'),
+(7, 'AI');
 
 INSERT INTO question (id, statement, subject_id, user_id) VALUES
 (1, 'Determinada sociedade de advogados deseja se associar a advogados que não a integram para prestação de serviços e participação nos resultados. Segundo a legislação aplicável à formalização desse vínculo jurídico, assinale a opção que indica, corretamente, a conclusão dos administradores da sociedade de advogados.', 3, 1),
@@ -55,6 +57,8 @@ INSERT INTO answer (text, is_correct, id_question) VALUES
 ('Valmir não poderá exercer a advocacia remunerada, pois ocupa cargo incompatível, mas poderá exercer a advocacia pro bono.', TRUE, 6),
 ('Valmir não poderá exercer a advocacia, mesmo pro bono, uma vez que o cargo público que ocupa atrai o regime da incompatibilidade.', FALSE, 6),
 ('A condição de servidor público atrai o regime do impedimento, razão pela qual Valmir não poderá exercer a advocacia contra a Fazenda Pública que o remunera. Observado esse impedimento, não haverá óbice para o exercício da advocacia pro bono.', FALSE, 6);
+
+SELECT setval('question_id_seq', (SELECT MAX(id) FROM question));
 
 -- +goose StatementEnd
 

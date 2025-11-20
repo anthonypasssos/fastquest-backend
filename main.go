@@ -2,6 +2,7 @@ package main
 
 import (
 	"flashquest/database"
+	"flashquest/handlers"
 	"fmt"
 	"log"
 )
@@ -23,6 +24,7 @@ import (
 func main() {
 	fmt.Println("Running backend")
 	database.InitDB()
+	handlers.InitGemini()
 
 	srv := NewServer()
 	log.Fatal(srv.ListenAndServe())

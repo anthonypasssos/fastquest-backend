@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	//"FlashQuest/database"
@@ -20,10 +21,14 @@ func NewServer() *http.Server {
 	registerPaths(r)
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "https://fastquest.vercel.app"}, // Origem permitida
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
 		AllowCredentials: true,
+		AllowedOrigins:   []string{"https://fastquest.vercel.app"},
+
+		AllowOriginFunc: func(origin string) bool {
+			return strings.HasPrefix(origin, "http://localhost")
+		},
 	})
 
 	handler := c.Handler(r)
@@ -53,6 +58,10 @@ func registerPaths(r *mux.Router) {
 	r.HandleFunc("/question-sets", handlers.GetLists).Methods("GET")
 	r.HandleFunc("/question-sets/{id}", handlers.GetQuestionSet).Methods("GET")
 	r.HandleFunc("/question-sets/{id}/questions", handlers.GetQuestionsFromSet).Methods("GET")
-	
+
+	//AI requests
+	r.HandleFunc("/ai/gen-question", handlers.PostAIGenQuestion).Methods("POST")
+	r.HandleFunc("/ai/gen-questionset", handlers.PostAIGenQuestionSet).Methods("POST")
+
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 }

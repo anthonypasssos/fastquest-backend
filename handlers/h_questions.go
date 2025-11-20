@@ -6,6 +6,7 @@ import (
 	"flashquest/database"
 	"flashquest/pkg/models"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 
@@ -62,7 +63,7 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var questionsToProcess []QuestionInput
-	var createdQuestions []models.Question 
+	var createdQuestions []models.Question
 
 	var questionArray []QuestionInput
 	errArray := json.Unmarshal(body, &questionArray)
@@ -109,6 +110,7 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, fmt.Sprintf("Error creating question: %v", result.Error), http.StatusInternalServerError)
 			return
 		}
+
 		createdQuestions = append(createdQuestions, question)
 	}
 
@@ -117,6 +119,44 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 	} else {
 		sendJSON(w, createdQuestions, http.StatusCreated)
 	}
+}
+
+func SendQuestions(qs ...*models.Question) error {
+	for i, q := range qs {
+		if q.Statement == "" {
+			return fmt.Errorf("question.Statement at index %d cannot be empty", i)
+		}
+	}
+
+	db := database.GetDB()
+	if db == nil {
+		return errors.New("database connection not established")
+	}
+
+	if err := db.Create(qs).Error; err != nil {
+		return fmt.Errorf("failed to create question: %w", err)
+	}
+
+	return nil
+}
+
+func SendAnswers(a *[]models.Answer) error {
+	for i, a := range *a {
+		if a.Text == "" {
+			return fmt.Errorf("answer.Text at index %d cannot be empty", i)
+		}
+	}
+
+	db := database.GetDB()
+	if db == nil {
+		return errors.New("database connection not established")
+	}
+
+	if err := db.Create(a).Error; err != nil {
+		return fmt.Errorf("failed to create question: %w", err)
+	}
+
+	return nil
 }
 
 /*

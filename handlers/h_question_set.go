@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"flashquest/database"
 	"flashquest/pkg/models"
 	"fmt"
@@ -78,6 +79,41 @@ func CreateQuestionSet(w http.ResponseWriter, r *http.Request) {
 	// Retorna o question set criado
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(questionSet)
+}
+
+func SendQuestionSets(qs ...*models.QuestionSet) error {
+	for i, a := range qs {
+		if a.Name == "" {
+			return fmt.Errorf("questionSet.Name at index %d cannot be empty", i)
+		}
+		if a.Description == "" {
+			return fmt.Errorf("questionSet.Description at index %d cannot be empty", i)
+		}
+	}
+
+	db := database.GetDB()
+	if db == nil {
+		return errors.New("database connection not established")
+	}
+
+	if err := db.Create(qs).Error; err != nil {
+		return fmt.Errorf("failed to create question: %w", err)
+	}
+
+	return nil
+}
+
+func sendQuestionSetQuestion(qqs ...*models.QuestionSetQuestion) error {
+	db := database.GetDB()
+	if db == nil {
+		return errors.New("database connection not established")
+	}
+
+	if err := db.Create(qqs).Error; err != nil {
+		return fmt.Errorf("failed to create question: %w", err)
+	}
+
+	return nil
 }
 
 func GetQuestionSet(w http.ResponseWriter, r *http.Request) {
