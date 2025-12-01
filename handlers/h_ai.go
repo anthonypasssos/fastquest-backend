@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"flashquest/helpers"
 	"flashquest/pkg/models"
 	"fmt"
 	"io"
@@ -200,7 +201,7 @@ func addAIQuestion(aiQuestion AIQuestionResponse) {
 	log.Println("Successful Answer Insert")
 }
 
-func addAIQuestionSet(aiQuestionSet AIQuestionSetResponse) {
+func addAIQuestionSet(aiQuestionSet AIQuestionSetResponse) error {
 	questionSet := models.QuestionSet{
 		Name:         aiQuestionSet.Name,
 		Description:  aiQuestionSet.Description,
@@ -210,21 +211,19 @@ func addAIQuestionSet(aiQuestionSet AIQuestionSetResponse) {
 		Type:         "list",
 	}
 
-	SendQuestionSets(&questionSet)
+	errSendQS := SendQuestionSets(&questionSet)
 
-	log.Println("Successful QuestionSet Insert")
+	if errSendQS != nil {
+		return errSendQS
+	}
 
 	questions := formatQuestions(aiQuestionSet.Questions...)
 
-	slicePtr := make([]*models.Question, 0, len(questions))
+	errSendQ := SendQuestions(helpers.PtrSlice(questions)...)
 
-	for i := range questions {
-		slicePtr = append(slicePtr, &questions[i])
+	if errSendQ != nil {
+		return errSendQ
 	}
-
-	SendQuestions(slicePtr...)
-
-	log.Println("Successful Question Insert")
 
 	answers := make([]models.Answer, 0, len(aiQuestionSet.Questions)*4)
 
@@ -232,9 +231,11 @@ func addAIQuestionSet(aiQuestionSet AIQuestionSetResponse) {
 		answers = append(answers, formatAnswer(questions[i].ID, q.Answers...)...)
 	}
 
-	SendAnswers(&answers)
+	errSendA := SendAnswers(&answers)
 
-	log.Println("Successful Answer Insert")
+	if errSendA != nil {
+		return errSendA
+	}
 
 	questionSetQuestion := make([]models.QuestionSetQuestion, 0, len(questions))
 
@@ -246,15 +247,13 @@ func addAIQuestionSet(aiQuestionSet AIQuestionSetResponse) {
 		})
 	}
 
-	questionSetQuestionPrt := make([]*models.QuestionSetQuestion, 0, len(questionSetQuestion))
+	errSendQSQ := sendQuestionSetQuestion(helpers.PtrSlice(questionSetQuestion)...)
 
-	for i := range questionSetQuestion {
-		questionSetQuestionPrt = append(questionSetQuestionPrt, &questionSetQuestion[i])
+	if errSendQSQ != nil {
+		return errSendQSQ
 	}
 
-	sendQuestionSetQuestion(questionSetQuestionPrt...)
-
-	log.Println("Successful Answer Insert")
+	return nil
 }
 
 func PostAIGenQuestion(w http.ResponseWriter, r *http.Request) {
@@ -289,10 +288,13 @@ func PostAIGenQuestionSet(w http.ResponseWriter, r *http.Request) {
 	errConvert := json.Unmarshal(body, &test)
 
 	if errConvert != nil {
-		http.Error(w, "Invalid body", http.StatusInternalServerError)
+		http.Error(w, "Invalid body", http.StatusBadRequest)
 		return
 	}
 
-	log.Println("Successful POST")
-	addAIQuestionSet(genQuestionSet(test.Text))
+	errAddQS := addAIQuestionSet(genQuestionSet(test.Text))
+
+	if errAddQS != nil {
+		http.Error(w, "Failed to generate question set", http.StatusInternalServerError)
+	}
 }

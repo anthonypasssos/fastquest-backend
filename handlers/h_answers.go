@@ -6,6 +6,7 @@ import (
 	"flashquest/database"
 	"flashquest/pkg/models"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -111,4 +112,60 @@ func GetAnswers(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(answers); err != nil {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
+}
+
+type AnswersBody struct {
+	AnswersIDs []uint `json:"answer_ids"`
+}
+
+func GetAnswersByIDArray(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+		return
+	}
+
+	var answersBody AnswersBody
+
+	errConvert := json.Unmarshal(body, &answersBody)
+
+	if errConvert != nil {
+		http.Error(w, "Invalid body", http.StatusBadRequest)
+		return
+	}
+
+	db := database.GetDB()
+	if db == nil {
+		http.Error(w, "Database connection not established", http.StatusInternalServerError)
+		return
+	}
+
+	answers, _ := readAnswersByIDArray(db, answersBody.AnswersIDs)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(answers); err != nil {
+		http.Error(w, "Error encoding response", http.StatusInternalServerError)
+	}
+}
+
+// db é a sua instância de *gorm.DB já inicializada e conectada
+func readAnswersByIDArray(db *gorm.DB, ids []uint) ([]models.Answer, error) {
+	var answers []models.Answer
+
+	// GORM transforma:
+	// "id IN (?)" + [1, 5, 10]
+	// Em SQL: "SELECT * FROM answers WHERE id IN (1, 5, 10);"
+	resultado := db.Where("id IN (?)", ids).Find(&answers)
+
+	if resultado.Error != nil {
+		// Se o erro for "record not found", significa que a lista de answers estava vazia,
+		// mas é um resultado válido (0 answers encontrados).
+		// Podemos retornar nil se a intenção for apenas ver se houve um erro de conexão/consulta.
+		if resultado.Error == gorm.ErrRecordNotFound {
+			return answers, nil // Retorna lista vazia e sem erro
+		}
+		return nil, resultado.Error
+	}
+
+	return answers, nil
 }
