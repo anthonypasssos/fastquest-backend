@@ -19,13 +19,10 @@ type Source struct {
 }
 
 type UnifiedSource struct {
-	ID   uint   `json:"id"`   // ID da Fonte (Ex: ID da OAB)
-	Name string `json:"name"` // Ex: "OAB"
-	Type string `json:"type"` // "EXAM" ou "CLASS"
-
-	// Aqui está o pulo do gato: um campo formatado ou genérico
-	Info     string                 `json:"info"`     // Ex: "XXXVIII Exame - 2023"
-	Metadata map[string]interface{} `json:"metadata"` // Dados extras flexíveis
+	ID       uint                   `json:"id"`
+	Name     string                 `json:"name"`
+	Type     string                 `json:"type"`
+	Metadata map[string]interface{} `json:"metadata"`
 }
 
 type SourceExamBody struct {

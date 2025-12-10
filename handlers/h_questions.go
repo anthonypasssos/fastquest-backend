@@ -245,7 +245,12 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendPaginatedResponse(w, questions, total, limit, page)
+	var questionsResp []models.QuestionResponse
+	for _, q := range questions {
+		questionsResp = append(questionsResp, q.ToResponse())
+	}
+
+	sendPaginatedResponse(w, questionsResp, total, limit, page)
 }
 
 func GetQuestion(w http.ResponseWriter, r *http.Request) {
@@ -280,7 +285,7 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(question); err != nil {
+	if err := json.NewEncoder(w).Encode(question.ToResponse()); err != nil {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
 }
