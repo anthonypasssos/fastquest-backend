@@ -22,7 +22,7 @@ type QuestionResponse struct {
 	UpdatedAt time.Time      `json:"updated_at"`
 	Statement string         `json:"statement"`
 	Subject   *Subject       `json:"subject,omitempty"`
-	User      *User          `json:"user,omitempty"`
+	User      *UserResponse  `json:"user,omitempty"`
 	Source    *UnifiedSource `json:"source,omitempty"`
 	Answers   *[]Answer      `json:"answers,omitempty"`
 }
@@ -54,7 +54,8 @@ func (q Question) ToResponse() QuestionResponse {
 	}
 
 	if q.User != nil {
-		resp.User = q.User
+		uResp := q.User.ToResponse()
+		resp.User = &uResp
 	}
 
 	if q.Answers != nil && len(*q.Answers) > 0 {

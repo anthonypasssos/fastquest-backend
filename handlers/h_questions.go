@@ -26,30 +26,6 @@ type SafeUser struct {
 	Name string `json:"name"`
 }
 
-type QuestionDetail struct {
-	ID        uint             `json:"id"`
-	CreatedAt time.Time        `json:"created_at"`
-	UpdatedAt time.Time        `json:"updated_at"`
-	Statement string           `json:"statement"`
-	Subject   *models.Subject  `json:"subject,omitempty"`
-	Topic     *models.Topic    `json:"topic,omitempty"`
-	User      *SafeUser        `json:"user,omitempty"`
-	Source    *models.Source   `json:"source,omitempty"`
-	Answers   []models.Answer  `json:"answers"`
-	Comments  []models.Comment `json:"comments"`
-}
-
-type QuestionInfo struct {
-	ID        uint            `json:"id"`
-	CreatedAt time.Time       `json:"created_at"`
-	UpdatedAt time.Time       `json:"updated_at"`
-	Statement string          `json:"statement"`
-	Subject   *models.Subject `json:"subject,omitempty"`
-	Topic     *models.Topic   `json:"topic,omitempty"`
-	User      *SafeUser       `json:"user,omitempty"`
-	Source    *models.Origin  `json:"source,omitempty"`
-}
-
 type QuestionInput struct {
 	Statement            string `json:"statement"`
 	SubjectID            int    `json:"subject_id"`
@@ -254,14 +230,13 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetQuestion(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-
 	id := mux.Vars(r)["id"]
 	if id == "" {
 		http.Error(w, "ID parameter is required", http.StatusBadRequest)
 		return
 	}
 
+	query := r.URL.Query()
 	includeParam := query.Get("include")
 	var includes []string
 	if includeParam != "" {
@@ -291,6 +266,13 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetQuestionsByArray(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	includeParam := query.Get("include")
+	var includes []string
+	if includeParam != "" {
+		includes = strings.Split(includeParam, ",")
+	}
+
 	var req struct {
 		IDs []uint `json:"ids"`
 	}
@@ -307,12 +289,18 @@ func GetQuestionsByArray(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var questions []models.Question
-	if result := db.Where("id IN ?", req.IDs).Find(&questions); result.Error != nil {
+
+	if result := db.Scopes(models.ApplyIncludes(includes)).Where("id IN ?", req.IDs).Find(&questions); result.Error != nil {
 		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error), http.StatusInternalServerError)
 		return
 	}
 
-	sendJSON(w, questions, http.StatusOK)
+	var questionsResp []models.QuestionResponse
+	for _, q := range questions {
+		questionsResp = append(questionsResp, q.ToResponse())
+	}
+
+	sendJSON(w, questionsResp, http.StatusOK)
 }
 
 func DeleteQuestion(w http.ResponseWriter, r *http.Request) {
