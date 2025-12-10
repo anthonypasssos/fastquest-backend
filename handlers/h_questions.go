@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	filters "flashquest/pkg"
 	"time"
@@ -46,13 +47,14 @@ type QuestionInfo struct {
 	Subject   *models.Subject `json:"subject,omitempty"`
 	Topic     *models.Topic   `json:"topic,omitempty"`
 	User      *SafeUser       `json:"user,omitempty"`
-	Source    *models.Source  `json:"source,omitempty"`
+	Source    *models.Origin  `json:"source,omitempty"`
 }
 
 type QuestionInput struct {
-	Statement string `json:"statement"`
-	SubjectID int    `json:"subject_id"`
-	UserID    int    `json:"user_id"`
+	Statement            string `json:"statement"`
+	SubjectID            int    `json:"subject_id"`
+	UserID               int    `json:"user_id"`
+	SourceExamInstanceID *int   `json:"source_exam_instance_id"`
 }
 
 func CreateQuestion(w http.ResponseWriter, r *http.Request) {
@@ -99,11 +101,12 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 		}
 
 		question := models.Question{
-			Statement: input.Statement,
-			SubjectID: input.SubjectID,
-			UserID:    input.UserID,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
+			Statement:            input.Statement,
+			SubjectID:            input.SubjectID,
+			UserID:               input.UserID,
+			CreatedAt:            time.Now(),
+			UpdatedAt:            time.Now(),
+			SourceExamInstanceID: input.SourceExamInstanceID,
 		}
 
 		if result := db.Create(&question); result.Error != nil {
@@ -212,8 +215,6 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		orderBy = "created_at desc"
 	}
 
-	detail := query.Get("detail")
-
 	db := database.GetDB()
 	if db == nil {
 		http.Error(w, "Database connection not established", http.StatusInternalServerError)
@@ -229,6 +230,14 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	includeParam := query.Get("include")
+	var includes []string
+	if includeParam != "" {
+		includes = strings.Split(includeParam, ",")
+	}
+
+	queryBuilder = queryBuilder.Scopes(models.ApplyIncludes(includes))
+
 	var questions []models.Question
 	offset := (page - 1) * limit
 	if result := queryBuilder.Offset(offset).Limit(limit).Find(&questions); result.Error != nil {
@@ -236,24 +245,22 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var responseData interface{}
-	switch detail {
-	case "full":
-		responseData = buildDetailedQuestions(db, questions)
-	case "information":
-		responseData = buildInfoQuestions(db, questions)
-	default:
-		responseData = questions
-	}
-
-	sendPaginatedResponse(w, responseData, total, limit, page)
+	sendPaginatedResponse(w, questions, total, limit, page)
 }
 
 func GetQuestion(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
 	id := mux.Vars(r)["id"]
 	if id == "" {
 		http.Error(w, "ID parameter is required", http.StatusBadRequest)
 		return
+	}
+
+	includeParam := query.Get("include")
+	var includes []string
+	if includeParam != "" {
+		includes = strings.Split(includeParam, ",")
 	}
 
 	db := database.GetDB()
@@ -263,7 +270,7 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var question models.Question
-	if result := db.Where("id = ?", id).First(&question); result.Error != nil {
+	if result := db.Scopes(models.ApplyIncludes(includes)).Where("id = ?", id).First(&question); result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			http.Error(w, "Question not found", http.StatusNotFound)
 		} else {
@@ -272,14 +279,9 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	detail := r.URL.Query().Get("detail")
-	switch detail {
-	case "full":
-		sendJSON(w, getFullQuestionDetail(db, question), http.StatusOK)
-	case "information":
-		sendJSON(w, getInformationQuestionDetail(db, question), http.StatusOK)
-	default:
-		sendJSON(w, question, http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(question); err != nil {
+		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
 }
 
@@ -344,78 +346,6 @@ func applyFilters(query *gorm.DB, params map[string][]string) *gorm.DB {
 		}
 	}
 	return query
-}
-
-func buildDetailedQuestions(db *gorm.DB, questions []models.Question) []interface{} {
-	result := make([]interface{}, len(questions))
-	for i, q := range questions {
-		result[i] = getFullQuestionDetail(db, q)
-	}
-	return result
-}
-
-func buildInfoQuestions(db *gorm.DB, questions []models.Question) []interface{} {
-	result := make([]interface{}, len(questions))
-	for i, q := range questions {
-		result[i] = getInformationQuestionDetail(db, q)
-	}
-	return result
-}
-
-func getFullQuestionDetail(db *gorm.DB, question models.Question) interface{} {
-	questionID := strconv.FormatUint(uint64(question.ID), 10)
-	subject, _ := getQuestionSubject(db, question.SubjectID)
-	topic, _ := getQuestionTopic(db, questionID)
-	source, _ := getQuestionSource(db, questionID)
-	answers, _ := getQuestionAnswers(db, questionID)
-	comments, _ := getQuestionComments(db, questionID)
-	user, _ := getQuestionUser(db, question.UserID)
-
-	detail := QuestionDetail{
-		ID:        question.ID,
-		CreatedAt: question.CreatedAt,
-		UpdatedAt: question.UpdatedAt,
-		Statement: question.Statement,
-		Answers:   answers,
-		Comments:  comments,
-		Subject:   subject,
-		Topic:     topic,
-	}
-
-	if source != nil && len(source.Metadata) > 0 {
-		detail.Source = source
-	}
-	if user != nil {
-		detail.User = &SafeUser{ID: user.ID, Name: user.Name}
-	}
-
-	return detail
-}
-
-func getInformationQuestionDetail(db *gorm.DB, question models.Question) interface{} {
-	questionID := strconv.FormatUint(uint64(question.ID), 10)
-	subject, _ := getQuestionSubject(db, question.SubjectID)
-	topic, _ := getQuestionTopic(db, questionID)
-	source, _ := getQuestionSource(db, questionID)
-	user, _ := getQuestionUser(db, question.UserID)
-
-	info := QuestionInfo{
-		ID:        question.ID,
-		CreatedAt: question.CreatedAt,
-		UpdatedAt: question.UpdatedAt,
-		Statement: question.Statement,
-		Subject:   subject,
-		Topic:     topic,
-	}
-
-	if source != nil && len(source.Metadata) > 0 {
-		info.Source = source
-	}
-	if user != nil {
-		info.User = &SafeUser{ID: user.ID, Name: user.Name}
-	}
-
-	return info
 }
 
 func sendJSON(w http.ResponseWriter, data interface{}, statusCode int) {

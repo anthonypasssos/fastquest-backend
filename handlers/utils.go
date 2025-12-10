@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flashquest/pkg/models"
 	"net/http"
+
 	"gorm.io/gorm"
 )
 
@@ -29,19 +30,6 @@ func getQuestionTopic(db *gorm.DB, questionID string) (*models.Topic, error) {
 		return nil, err
 	}
 	return &topic, nil
-}
-
-func getQuestionSource(db *gorm.DB, questionID string) (*models.Source, error) {
-	var source models.Source
-	err := db.Table("question_source").
-		Select("source.id, source.name, source.type, source.metadata").
-		Joins("JOIN source ON question_source.source_id = source.id").
-		Where("question_source.question_id = ?", questionID).
-		Scan(&source).Error
-	if err != nil {
-		return nil, err
-	}
-	return &source, nil
 }
 
 func getQuestionAnswers(db *gorm.DB, questionID string) ([]models.Answer, error) {

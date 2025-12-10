@@ -5,9 +5,6 @@ import (
 	"log"
 	"os"
 
-	"flashquest/pkg/models"
-	"strings"
-
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -59,13 +56,6 @@ func InitDB() *gorm.DB {
 
 	if err := sqlDB.Ping(); err != nil {
 		log.Fatal("Failed to ping database:", err)
-	}
-
-	if err := db.AutoMigrate(&models.Question{}); err != nil {
-		if !strings.Contains(err.Error(), "already exists") {
-			log.Fatal("Migration failed:", err)
-		}
-		log.Println("Tables already exist, continuing")
 	}
 
 	DB = db
