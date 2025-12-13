@@ -181,7 +181,7 @@ func CreateQuestion(w http.ResponseWriter, r *http.Request) {
 func GetQuestions(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	page := parseInt(query.Get("page"), 1)
-	limit := parseInt(query.Get("limit"), 10)
+	limit := parseInt(query.Get("perPage"), 10)
 	if limit > 100 {
 		limit = 100
 	}

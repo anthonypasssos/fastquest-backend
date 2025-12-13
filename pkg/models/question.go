@@ -17,14 +17,14 @@ type QuestionDoc struct {
 }
 
 type QuestionResponse struct {
-	ID        uint           `json:"id"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	Statement string         `json:"statement"`
-	Subject   *Subject       `json:"subject,omitempty"`
-	User      *UserResponse  `json:"user,omitempty"`
-	Source    *UnifiedSource `json:"source,omitempty"`
-	Answers   *[]Answer      `json:"answers,omitempty"`
+	ID        uint             `json:"id"`
+	CreatedAt time.Time        `json:"created_at"`
+	UpdatedAt time.Time        `json:"updated_at"`
+	Statement string           `json:"statement"`
+	Subject   *SubjectResponse `json:"subject,omitempty"`
+	User      *UserResponse    `json:"user,omitempty"`
+	Source    *UnifiedSource   `json:"source,omitempty"`
+	Answers   *[]Answer        `json:"answers,omitempty"`
 }
 
 type Question struct {
@@ -50,7 +50,8 @@ func (q Question) ToResponse() QuestionResponse {
 	}
 
 	if q.Subject != nil {
-		resp.Subject = q.Subject
+		sResp := q.Subject.ToResponse()
+		resp.Subject = &sResp
 	}
 
 	if q.User != nil {
