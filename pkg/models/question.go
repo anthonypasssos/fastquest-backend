@@ -79,12 +79,11 @@ func (q Question) ToResponse() QuestionResponse {
 	return resp
 }
 
-func ApplyIncludes(includes []string) func(*gorm.DB) *gorm.DB {
+func ApplyQuestionIncludes(includes []string) func(*gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		for _, include := range includes {
 			switch include {
 			case "source":
-				// Carrega ambos os caminhos possíveis de source + os dados da fonte
 				db = db.Preload("SourceExamInstance.Source")
 			case "answers":
 				db = db.Preload("Answers")

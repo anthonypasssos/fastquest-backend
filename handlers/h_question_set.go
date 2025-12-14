@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
@@ -120,18 +121,25 @@ func GetQuestionSet(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
+	query := r.URL.Query()
+	includeParam := query.Get("include")
+	var includes []string
+	if includeParam != "" {
+		includes = strings.Split(includeParam, ",")
+	}
+
 	db := database.GetDB()
 
 	var questionSet models.QuestionSet
 
-	result := db.First(&questionSet, id)
+	result := db.Scopes(models.ApplyQuestionSetIncludes(includes)).First(&questionSet, id)
 	if result.Error != nil {
 		http.Error(w, fmt.Sprintf("Error fetching question set: %v", result.Error), http.StatusNotFound)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(questionSet)
+	json.NewEncoder(w).Encode(questionSet.ToResponse())
 }
 
 func GetQuestionsFromSet(w http.ResponseWriter, r *http.Request) {
@@ -206,19 +214,17 @@ func GetQuestionsFromSet(w http.ResponseWriter, r *http.Request) {
 func GetLists(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
-	// Paginação
 	page, _ := strconv.Atoi(query.Get("page"))
 	if page < 1 {
 		page = 1
 	}
 
-	limit, _ := strconv.Atoi(query.Get("limit"))
+	limit, _ := strconv.Atoi(query.Get("perPage"))
 	if limit < 1 || limit > 100 {
 		limit = 10
 	}
 
-	// Ordenação segura
-	orderBy := query.Get("order_by")
+	orderBy := query.Get("orderBy")
 	allowedOrders := map[string]bool{
 		"creation_date desc": true,
 		"creation_date asc":  true,
@@ -238,23 +244,23 @@ func GetLists(w http.ResponseWriter, r *http.Request) {
 	queryBuilder := db.Model(&models.QuestionSet{})
 
 	// 🔸 Filtro user_id
-	if userId := query.Get("user_id"); userId != "" {
+	if userId := query.Get("userId"); userId != "" {
 		uid, err := strconv.Atoi(userId)
 		if err != nil {
-			http.Error(w, "Invalid user_id", http.StatusBadRequest)
+			http.Error(w, "Invalid userId", http.StatusBadRequest)
 			return
 		}
-		queryBuilder = queryBuilder.Where("user_id = ?", uid)
+		queryBuilder = queryBuilder.Where("userId = ?", uid)
 	}
 
 	// 🔸 Filtro is_private
-	if isPrivate := query.Get("is_private"); isPrivate != "" {
+	if isPrivate := query.Get("isPrivate"); isPrivate != "" {
 		private, err := strconv.ParseBool(isPrivate)
 		if err != nil {
-			http.Error(w, "Invalid is_private value", http.StatusBadRequest)
+			http.Error(w, "Invalid isPrivate value", http.StatusBadRequest)
 			return
 		}
-		queryBuilder = queryBuilder.Where("is_private = ?", private)
+		queryBuilder = queryBuilder.Where("isPrivate = ?", private)
 	}
 
 	// 🔍 Filtro de busca por nome ou descrição
@@ -273,18 +279,30 @@ func GetLists(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	includeParam := query.Get("include")
+	var includes []string
+	if includeParam != "" {
+		includes = strings.Split(includeParam, ",")
+	}
+
 	offset := (page - 1) * limit
 	var lists []models.QuestionSet
-	result := queryBuilder.Order(orderBy).Offset(offset).Limit(limit).Find(&lists)
+	result := queryBuilder.Scopes(models.ApplyQuestionSetIncludes(includes)).Order(orderBy).Offset(offset).Limit(limit).Find(&lists)
 
 	if result.Error != nil {
 		http.Error(w, fmt.Sprintf("Error fetching lists: %v", result.Error), http.StatusInternalServerError)
 		return
 	}
 
+	var responseLists []models.QuestionSetResponse
+
+	for _, qs := range lists {
+		responseLists = append(responseLists, qs.ToResponse())
+	}
+
 	// Resposta
 	response := map[string]interface{}{
-		"data": lists,
+		"data": responseLists,
 		"pagination": map[string]interface{}{
 			"total":        total,
 			"per_page":     limit,

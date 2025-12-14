@@ -212,9 +212,9 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		includes = strings.Split(includeParam, ",")
 	}
 
-	queryBuilder = queryBuilder.Scopes(models.ApplyIncludes(includes))
-
 	var questions []models.Question
+	queryBuilder = queryBuilder.Scopes(models.ApplyQuestionIncludes(includes))
+
 	offset := (page - 1) * limit
 	if result := queryBuilder.Offset(offset).Limit(limit).Find(&questions); result.Error != nil {
 		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error), http.StatusInternalServerError)
@@ -250,7 +250,7 @@ func GetQuestion(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var question models.Question
-	if result := db.Scopes(models.ApplyIncludes(includes)).Where("id = ?", id).First(&question); result.Error != nil {
+	if result := db.Scopes(models.ApplyQuestionIncludes(includes)).Where("id = ?", id).First(&question); result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			http.Error(w, "Question not found", http.StatusNotFound)
 		} else {
@@ -290,7 +290,7 @@ func GetQuestionsByArray(w http.ResponseWriter, r *http.Request) {
 
 	var questions []models.Question
 
-	if result := db.Scopes(models.ApplyIncludes(includes)).Where("id IN ?", req.IDs).Find(&questions); result.Error != nil {
+	if result := db.Scopes(models.ApplyQuestionIncludes(includes)).Where("id IN ?", req.IDs).Find(&questions); result.Error != nil {
 		http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error), http.StatusInternalServerError)
 		return
 	}
