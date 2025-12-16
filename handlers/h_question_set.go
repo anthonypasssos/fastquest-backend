@@ -226,13 +226,13 @@ func GetLists(w http.ResponseWriter, r *http.Request) {
 
 	orderBy := query.Get("orderBy")
 	allowedOrders := map[string]bool{
-		"creation_date desc": true,
-		"creation_date asc":  true,
-		"name asc":           true,
-		"name desc":          true,
+		"created_at desc": true,
+		"created_at asc":  true,
+		"name asc":        true,
+		"name desc":       true,
 	}
 	if !allowedOrders[orderBy] {
-		orderBy = "creation_date desc"
+		orderBy = "created_at desc"
 	}
 
 	db := database.GetDB()

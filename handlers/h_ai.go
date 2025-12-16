@@ -203,12 +203,12 @@ func addAIQuestion(aiQuestion AIQuestionResponse) {
 
 func addAIQuestionSet(aiQuestionSet AIQuestionSetResponse) error {
 	questionSet := models.QuestionSet{
-		Name:         aiQuestionSet.Name,
-		Description:  aiQuestionSet.Description,
-		UserID:       5,
-		CreationDate: time.Now(),
-		IsPrivate:    false,
-		Type:         "list",
+		Name:        aiQuestionSet.Name,
+		Description: aiQuestionSet.Description,
+		UserID:      5,
+		CreatedAt:   time.Now(),
+		IsPrivate:   false,
+		Type:        "list",
 	}
 
 	errSendQS := SendQuestionSets(&questionSet)

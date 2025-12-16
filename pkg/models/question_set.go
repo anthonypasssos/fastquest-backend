@@ -7,26 +7,26 @@ import (
 )
 
 type QuestionSetResponse struct {
-	ID           int                `json:"id"`
-	Name         string             `json:"name"`
-	Description  string             `json:"description"`
-	Type         string             `json:"type"`
-	User         *UserResponse      `json:"user,omitempty"`
-	Questions    []QuestionResponse `json:"questions,omitempty"`
-	CreationDate time.Time          `json:"creation_date"`
-	IsPrivate    bool               `json:"is_private"`
+	ID          int                `json:"id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Type        string             `json:"type"`
+	User        *UserResponse      `json:"user,omitempty"`
+	Questions   []QuestionResponse `json:"questions,omitempty"`
+	CreatedAt   time.Time          `json:"created_at"`
+	IsPrivate   bool               `json:"is_private"`
 }
 
 type QuestionSet struct {
-	ID           int `gorm:"primaryKey;autoIncrement"`
-	Name         string
-	Description  string
-	Type         string `gorm:"not null"`
-	UserID       int
-	User         *User      `gorm:"foreignKey:UserID"`
-	Questions    []Question `gorm:"many2many:question_set_question;"`
-	CreationDate time.Time  `gorm:"autoCreateTime"`
-	IsPrivate    bool       `gorm:"not null"`
+	ID          int `gorm:"primaryKey;autoIncrement"`
+	Name        string
+	Description string
+	Type        string `gorm:"not null"`
+	UserID      int
+	User        *User      `gorm:"foreignKey:UserID"`
+	Questions   []Question `gorm:"many2many:question_set_question;"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime"`
+	IsPrivate   bool       `gorm:"not null"`
 }
 
 type QuestionSetQuestion struct {
@@ -38,12 +38,12 @@ type QuestionSetQuestion struct {
 
 func (qs QuestionSet) ToResponse() QuestionSetResponse {
 	set := QuestionSetResponse{
-		ID:           qs.ID,
-		Name:         qs.Name,
-		Description:  qs.Description,
-		Type:         qs.Type,
-		CreationDate: qs.CreationDate,
-		IsPrivate:    qs.IsPrivate,
+		ID:          qs.ID,
+		Name:        qs.Name,
+		Description: qs.Description,
+		Type:        qs.Type,
+		CreatedAt:   qs.CreatedAt,
+		IsPrivate:   qs.IsPrivate,
 	}
 
 	if qs.User != nil {

@@ -186,7 +186,7 @@ func GetQuestions(w http.ResponseWriter, r *http.Request) {
 		limit = 100
 	}
 
-	orderBy := query.Get("order_by")
+	orderBy := query.Get("orderBy")
 	if orderBy == "" {
 		orderBy = "created_at desc"
 	}
