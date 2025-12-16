@@ -182,7 +182,13 @@ func GetQuestionsFromSet(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, fmt.Sprintf("Error fetching questions: %v", result.Error), http.StatusInternalServerError)
 			return
 		}
-		json.NewEncoder(w).Encode(questions)
+
+		var jQuestions []models.QuestionResponse
+		for _, q := range questions {
+			jQuestions = append(jQuestions, q.ToResponse())
+		}
+
+		json.NewEncoder(w).Encode(jQuestions)
 	}
 }
 
