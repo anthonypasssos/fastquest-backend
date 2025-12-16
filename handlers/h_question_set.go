@@ -79,7 +79,7 @@ func CreateQuestionSet(w http.ResponseWriter, r *http.Request) {
 
 	// Retorna o question set criado
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(questionSet)
+	json.NewEncoder(w).Encode(questionSet.ToResponse())
 }
 
 func SendQuestionSets(qs ...*models.QuestionSet) error {
