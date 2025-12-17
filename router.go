@@ -66,5 +66,7 @@ func registerPaths(r *mux.Router) {
 	r.HandleFunc("/ai/gen-question", handlers.PostAIGenQuestion).Methods("POST")
 	r.HandleFunc("/ai/gen-questionset", handlers.PostAIGenQuestionSet).Methods("POST")
 
+	r.HandleFunc("/exam", handlers.CreateExam).Methods("POST")
+
 	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 }

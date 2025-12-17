@@ -7,12 +7,12 @@ type Origin struct {
 }
 
 type ExamInstance struct {
-	ID        uint   `gorm:primaryKey`
-	SourceId  uint   `gorm:"not null"`
-	Source    Source `gorm:"foreignKey:SourceId"`
-	Edition   uint   `gorm:"not null"`
-	Phase     uint   `gorm:"not null"`
-	Year      uint   `gorm:"not null"`
+	ID        uint   `gorm:primaryKey json:"id"`
+	SourceId  uint   `gorm:"not null" json:"source_id"`
+	Source    Source `gorm:"foreignKey:SourceId" json:"source"`
+	Edition   uint   `gorm:"not null" json:"edition"`
+	Phase     uint   `gorm:"not null" json:"phase"`
+	Year      uint   `gorm:"not null" json:"year"`
 	CreatedAt time.Time
 }
 

@@ -36,7 +36,7 @@ type Question struct {
 	Subject              *Subject `gorm:"foreignKey:SubjectID"`
 	UserID               int      `gorm:"not null"`
 	User                 *User    `gorm:"foreignKey:UserID"`
-	SourceExamInstanceID *int
+	SourceExamInstanceID *uint
 	SourceExamInstance   *ExamInstance `gorm:"foreignKey:SourceExamInstanceID"`
 	Answers              *[]Answer
 }

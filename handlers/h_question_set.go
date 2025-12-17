@@ -24,6 +24,15 @@ type NewList struct {
 	Questions   []int  `json:"questions"`
 }
 
+type NewListWithQuestions struct {
+	Name        string          `json:"name"`
+	Type        string          `json:"type"`
+	Description string          `json:"description"`
+	IsPrivate   bool            `json:"is_private"`
+	UserID      int             `json:"user_id"`
+	Questions   []QuestionInput `json:"questions"`
+}
+
 func CreateQuestionSet(w http.ResponseWriter, r *http.Request) {
 	var newList NewList
 
